@@ -5,6 +5,8 @@ import { RedisModule } from './common/redis/redis.module.js';
 import { IdempotencyService } from './common/idempotency/idempotency.service.js';
 import { InventoryModule } from './modules/inventory/inventory.module.js';
 import { ReservationsModule } from './modules/reservations/reservations.module.js';
+import { AdaptorsModule } from './modules/adaptors/adaptors.module.js';
+import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { ReservationsModule } from './modules/reservations/reservations.module.j
     }),
     RedisModule,
     InventoryModule,
+    AdaptorsModule,
+    WebhooksModule,
     ReservationsModule,
   ],
   providers: [IdempotencyService],
