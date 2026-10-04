@@ -1,0 +1,24 @@
+{
+  "name": "channel-integration-hub",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "db:generate": "pnpm --filter @cih/database generate",
+    "db:migrate": "pnpm --filter @cih/database migrate",
+    "db:seed": "pnpm --filter @cih/database seed",
+    "db:studio": "pnpm --filter @cih/database studio",
+    "build": "pnpm -r run build",
+    "dev:api": "pnpm --filter @cih/api dev",
+    "dev:partners": "pnpm --filter @cih/mock-partners dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.3.0",
+    "rimraf": "^6.0.0",
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "pnpm@9.12.0"
+}

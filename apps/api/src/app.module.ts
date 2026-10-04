@@ -1,0 +1,29 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
+import { RedisModule } from './common/redis/redis.module.js';
+import { IdempotencyService } from './common/idempotency/idempotency.service.js';
+import { InventoryModule } from './modules/inventory/inventory.module.js';
+import { ReservationsModule } from './modules/reservations/reservations.module.js';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '../../.env',
+    }),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: Number(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD || 'redis_secure_password',
+      },
+    }),
+    RedisModule,
+    InventoryModule,
+    ReservationsModule,
+  ],
+  providers: [IdempotencyService],
+  exports: [IdempotencyService],
+})
+export class AppModule {}

@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PartnerAuthType {
+  API_KEY
+  OAUTH2
+  HMAC_SIGNATURE
+}
+
+enum PartnerStatus {
+  ACTIVE
+  DEGRADED
+  CIRCUIT_OPEN
+  DISABLED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REJECTED
+}
+
+enum SyncJobType {
+  INBOUND_WEBHOOK
+  OUTBOUND_PUSH
+  SCHEDULED_POLL
+}
+
+enum SyncJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD_LETTER
+}
+
+enum DriftResolution {
+  AUTO_CORRECTED
+  FLAGGED_FOR_REVIEW
+  DISMISSED
+}
+
+model Partner {
+  id              String          @id @default(uuid())
+  slug            String          @unique // e.g., "partner_a", "partner_b", "partner_c"
+  name            String
+  authType        PartnerAuthType
+  status          PartnerStatus   @default(ACTIVE)
+  webhookSecret   String?
+  apiKey          String?
+  oauthConfig     Json?           // { tokenUrl, clientId, clientSecret, accessToken, expiresAt }
+  rateLimitConfig Json?           // { maxRps: 10, burstLimit: 20 }
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  reservations     Reservation[]
+  syncJobs         SyncJob[]
+  reconciliation   ReconciliationLog[]
+  propertyMappings PropertyPartnerMapping[]
+
+  @@map("partners")
+}
+
+model Property {
+  id        String   @id @default(uuid())
+  name      String
+  timezone  String   @default("UTC")
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventoryUnits  InventoryUnit[]
+  reservations    Reservation[]
+  partnerMappings PropertyPartnerMapping[]
+
+  @@map("properties")
+}
+
+model PropertyPartnerMapping {
+  id                 String   @id @default(uuid())
+  propertyId         String
+  partnerId          String
+  externalPropertyId String
+  fieldMapping       Json?
+  createdAt          DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  partner  Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, partnerId])
+  @@unique([partnerId, externalPropertyId])
+  @@map("property_partner_mappings")
+}
+
+model InventoryUnit {
+  id           String   @id @default(uuid())
+  propertyId   String
+  externalCode String   // e.g., "DELUXE_KING", "STANDARD_QUEEN"
+  name         String
+  totalUnits   Int      // Total physical capacity pool
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property     Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  calendar     InventoryCalendar[]
+  reservations Reservation[]
+
+  @@unique([propertyId, externalCode])
+  @@map("inventory_units")
+}
+
+model InventoryCalendar {
+  id              String        @id @default(uuid())
+  inventoryUnitId String
+  date            DateTime      @db.Date
+  availableUnits  Int           // Decrements on reservation confirmation
+  priceInCents    Int           // Stored in smallest monetary unit
+  version         Int           @default(0) // Optimistic locking counter
+
+  inventoryUnit   InventoryUnit @relation(fields: [inventoryUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryUnitId, date])
+  @@index([date])
+  @@map("inventory_calendar")
+}
+
+model Reservation {
+  id                String            @id @default(uuid())
+  propertyId        String
+  inventoryUnitId   String
+  partnerId         String
+  externalBookingId String
+  status            ReservationStatus @default(PENDING)
+  checkInDate       DateTime          @db.Date
+  checkOutDate      DateTime          @db.Date
+  unitsBooked       Int               @default(1)
+  guestName         String
+  guestEmail        String?
+  totalPriceCents   Int
+  currency          String            @default("USD")
+  rawPayload        Json?
+  version           Int               @default(1)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  property      Property      @relation(fields: [propertyId], references: [id])
+  inventoryUnit InventoryUnit @relation(fields: [inventoryUnitId], references: [id])
+  partner       Partner       @relation(fields: [partnerId], references: [id])
+
+  @@unique([partnerId, externalBookingId])
+  @@index([checkInDate, checkOutDate])
+  @@map("reservations")
+}
+
+model IdempotencyRecord {
+  key            String    @id
+  scope          String    // e.g., "WEBHOOK:PARTNER_A", "INVENTORY:UPDATE"
+  responseStatus Int?
+  responseBody   Json?
+  lockedUntil    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([lockedUntil])
+  @@map("idempotency_records")
+}
+
+model SyncJob {
+  id         String        @id @default(uuid())
+  partnerId  String
+  jobType    SyncJobType
+  entityType String
+  entityId   String?
+  status     SyncJobStatus @default(QUEUED)
+  attempts   Int           @default(0)
+  maxRetries Int           @default(5)
+  lastError  String?
+  payload    Json
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, status])
+  @@map("sync_jobs")
+}
+
+model ReconciliationLog {
+  id            String          @id @default(uuid())
+  partnerId     String
+  entityType    String
+  entityId      String
+  canonicalData Json
+  partnerData   Json
+  driftDetail   Json
+  resolution    DriftResolution @default(FLAGGED_FOR_REVIEW)
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, resolution])
+  @@map("reconciliation_logs")
+}
