@@ -91,6 +91,24 @@ export interface FetchWithTimeoutOptions extends RequestInit {
 }
 
 /**
+ * Redacts sensitive query parameter values (tokens, secrets, api keys, passwords) from URLs.
+ */
+export function redactSensitiveUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const sensitiveKeys = ['key', 'api_key', 'apikey', 'secret', 'token', 'password', 'client_secret', 'auth'];
+    for (const [key] of parsed.searchParams) {
+      if (sensitiveKeys.some((s) => key.toLowerCase().includes(s))) {
+        parsed.searchParams.set(key, '[REDACTED]');
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+/**
  * Wraps global fetch with timeout support and automatically propagates x-request-id.
  * Throws PartnerHttpError when the request fails, times out, or returns a non-2xx response.
  */
@@ -113,6 +131,18 @@ export async function fetchWithTimeout(
       : input instanceof URL
         ? input.toString()
         : input.url;
+
+  const safeUrl = redactSensitiveUrl(urlStr);
+
+  if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+    throw new PartnerHttpError({
+      message: `Invalid or disallowed URL protocol for request to ${safeUrl}`,
+      status: 400,
+      isRetryable: false,
+      partnerSlug,
+      url: safeUrl,
+    });
+  }
 
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => {
@@ -154,12 +184,12 @@ export async function fetchWithTimeout(
     if (!response.ok && throwOnHttpError) {
       const responseBody = await response.text().catch(() => '');
       throw new PartnerHttpError({
-        message: `Partner HTTP request to ${urlStr} failed with status ${response.status}`,
+        message: `Partner HTTP request to ${safeUrl} failed with status ${response.status}`,
         status: response.status,
         isRetryable: isRetryableStatusCode(response.status),
         responseBody,
         partnerSlug,
-        url: urlStr,
+        url: safeUrl,
       });
     }
 
@@ -171,11 +201,11 @@ export async function fetchWithTimeout(
 
     if (timeoutController.signal.aborted) {
       throw new PartnerHttpError({
-        message: `Request to ${urlStr} timed out after ${timeoutMs}ms`,
+        message: `Request to ${safeUrl} timed out after ${timeoutMs}ms`,
         status: 408,
         isRetryable: true,
         partnerSlug,
-        url: urlStr,
+        url: safeUrl,
         cause: error,
       });
     }
@@ -186,11 +216,11 @@ export async function fetchWithTimeout(
 
     // Network / connection errors
     throw new PartnerHttpError({
-      message: `Network error requesting ${urlStr}: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Network error requesting ${safeUrl}: ${error instanceof Error ? error.message : String(error)}`,
       status: 503,
       isRetryable: true,
       partnerSlug,
-      url: urlStr,
+      url: safeUrl,
       cause: error,
     });
   } finally {

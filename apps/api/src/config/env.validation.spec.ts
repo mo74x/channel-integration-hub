@@ -56,4 +56,28 @@ describe('validateEnv', () => {
       /Invalid url/,
     );
   });
+
+  it('should reject default dev secrets when NODE_ENV is production', () => {
+    const config = {
+      NODE_ENV: 'production',
+      ADMIN_API_KEY: 'cih_admin_secret_key_dev',
+    };
+
+    expect(() => validateEnv(config)).toThrow(
+      /Default development secrets.*must be replaced with strong unique secrets in production/,
+    );
+  });
+
+  it('should pass production validation when strong unique secrets are provided', () => {
+    const config = {
+      NODE_ENV: 'production',
+      ADMIN_API_KEY: 'prod_admin_very_strong_key_9999',
+      PARTNER_C_HMAC_SECRET: 'prod_hmac_secret_43875892347923847',
+      PARTNER_B_CLIENT_SECRET: 'prod_client_secret_38479238479',
+    };
+
+    const validated = validateEnv(config);
+    expect(validated.NODE_ENV).toBe('production');
+    expect(validated.ADMIN_API_KEY).toBe('prod_admin_very_strong_key_9999');
+  });
 });

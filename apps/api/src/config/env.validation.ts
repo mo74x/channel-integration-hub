@@ -28,7 +28,24 @@ export const envSchema = z.object({
 
   // External APIs
   OPENAI_API_KEY: z.string().optional(),
-});
+})
+  .refine(
+    (data) => {
+      if (data.NODE_ENV === 'production') {
+        return (
+          data.ADMIN_API_KEY !== 'cih_admin_secret_key_dev' &&
+          data.PARTNER_C_HMAC_SECRET !== 'c8f126f5e92be2b1a8f940821d3e86f8' &&
+          data.PARTNER_B_CLIENT_SECRET !== 'secret_b_oauth_token_val'
+        );
+      }
+      return true;
+    },
+    {
+      message:
+        'Default development secrets (ADMIN_API_KEY, PARTNER_C_HMAC_SECRET, PARTNER_B_CLIENT_SECRET) must be replaced with strong unique secrets in production',
+      path: ['ADMIN_API_KEY'],
+    },
+  );
 
 export type EnvConfig = z.infer<typeof envSchema>;
 

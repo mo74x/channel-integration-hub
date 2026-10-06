@@ -2,6 +2,7 @@ import {
   fetchWithTimeout,
   PartnerHttpError,
   isRetryableStatusCode,
+  redactSensitiveUrl,
 } from './http-client.js';
 import { requestContext } from '../middleware/request-id.middleware.js';
 
@@ -171,5 +172,25 @@ describe('fetchWithTimeout', () => {
     expect(mockFetch).toHaveBeenCalled();
     const calledInit = mockFetch.mock.calls[0][1];
     expect(calledInit.headers.get('x-request-id')).toBe('ctx-req-id-999');
+  });
+
+  it('redacts sensitive query parameter values from URL in logs and errors', () => {
+    const raw = 'https://api.partner.com/v1/sync?apiKey=super_secret_123&token=my_bearer_token&property=prop1';
+    const redacted = redactSensitiveUrl(raw);
+    expect(redacted).not.toContain('super_secret_123');
+    expect(redacted).not.toContain('my_bearer_token');
+    expect(redacted).toContain('apiKey=%5BREDACTED%5D');
+    expect(redacted).toContain('token=%5BREDACTED%5D');
+    expect(redacted).toContain('property=prop1');
+  });
+
+  it('rejects disallowed URL protocols to prevent SSRF vulnerabilities', async () => {
+    await expect(
+      fetchWithTimeout('file:///etc/passwd'),
+    ).rejects.toThrow(PartnerHttpError);
+
+    await expect(
+      fetchWithTimeout('javascript:alert(1)'),
+    ).rejects.toThrow(PartnerHttpError);
   });
 });

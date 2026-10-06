@@ -43,14 +43,16 @@ export default function DashboardPage() {
   const [replayingId, setReplayingId] = useState<string | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const API_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY || 'cih_admin_secret_key_dev';
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      const authHeaders = { 'x-api-key': API_KEY };
       const [pRes, jRes, rRes] = await Promise.all([
-        fetch(`${API_URL}/admin/partners`),
-        fetch(`${API_URL}/admin/jobs?status=DEAD_LETTER`),
-        fetch(`${API_URL}/admin/reconciliation-logs`),
+        fetch(`${API_URL}/admin/partners`, { headers: authHeaders }),
+        fetch(`${API_URL}/admin/jobs?status=DEAD_LETTER`, { headers: authHeaders }),
+        fetch(`${API_URL}/admin/reconciliation-logs`, { headers: authHeaders }),
       ]);
 
       if (pRes.ok) setPartners(await pRes.json());
@@ -70,7 +72,10 @@ export default function DashboardPage() {
   const handleReplay = async (jobId: string) => {
     setReplayingId(jobId);
     try {
-      const res = await fetch(`${API_URL}/admin/jobs/${jobId}/replay`, { method: 'POST' });
+      const res = await fetch(`${API_URL}/admin/jobs/${jobId}/replay`, {
+        method: 'POST',
+        headers: { 'x-api-key': API_KEY },
+      });
       if (res.ok) {
         await fetchData();
       }

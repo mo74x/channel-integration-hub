@@ -9,6 +9,7 @@ import {
 import { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@cih/database';
+import { PartnerHttpError } from '../http/http-client.js';
 
 export interface ErrorResponseEnvelope {
   statusCode: number;
@@ -95,7 +96,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
       }
     }
-    // 3. Fallback for unhandled generic errors
+    // 3. Handle PartnerHttpError (outbound partner communication failures)
+    else if (exception instanceof PartnerHttpError) {
+      statusCode = exception.status >= 400 && exception.status < 600 ? exception.status : HttpStatus.BAD_GATEWAY;
+      error = 'Upstream Partner Error';
+      message =
+        process.env.NODE_ENV === 'production'
+          ? `Upstream partner service request failed with status ${statusCode}`
+          : exception.message;
+    }
+    // 4. Fallback for unhandled generic errors
     else if (exception instanceof Error) {
       this.logger.error(
         `Unhandled exception for request [${requestId}] on ${request.method} ${request.url}: ${exception.message}`,

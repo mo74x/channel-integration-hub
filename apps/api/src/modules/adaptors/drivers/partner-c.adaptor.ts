@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
 import { PartnerAdaptor, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import { safeCompare } from '../../../common/crypto/safe-compare.js';
 
 @Injectable()
 export class PartnerCAdaptor implements PartnerAdaptor {
@@ -13,9 +14,12 @@ export class PartnerCAdaptor implements PartnerAdaptor {
     headers: Record<string, string | string[]>,
     rawBody: Buffer | string,
   ): Promise<WebhookValidationResult> {
-    const signature = headers['x-starlight-signature'] as string;
-    const timestamp = headers['x-starlight-timestamp'] as string;
-    const eventId = headers['x-starlight-event-id'] as string;
+    const rawSig = headers['x-starlight-signature'];
+    const signature = Array.isArray(rawSig) ? rawSig[0] : (rawSig as string);
+    const rawTs = headers['x-starlight-timestamp'];
+    const timestamp = Array.isArray(rawTs) ? rawTs[0] : (rawTs as string);
+    const rawEventId = headers['x-starlight-event-id'];
+    const eventId = Array.isArray(rawEventId) ? rawEventId[0] : (rawEventId as string);
 
     if (!signature || !timestamp || !eventId) {
       return { isValid: false, error: 'Missing HMAC signature, timestamp, or event-id headers' };
@@ -34,10 +38,7 @@ export class PartnerCAdaptor implements PartnerAdaptor {
       .update(`${timestamp}.${rawBuffer.toString('utf-8')}`)
       .digest('hex');
 
-    const signatureBuffer = Buffer.from(signature, 'hex');
-    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-
-    if (signatureBuffer.length !== expectedBuffer.length || !timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    if (!safeCompare(signature, expectedSignature)) {
       return { isValid: false, error: 'Cryptographic signature verification failed' };
     }
 

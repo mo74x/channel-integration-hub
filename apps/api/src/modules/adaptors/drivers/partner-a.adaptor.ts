@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ReservationStatus, CanonicalInventoryPushPayload, CanonicalReservationPayload } from '@cih/shared';
 import { PartnerAdaptor, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import { safeCompare } from '../../../common/crypto/safe-compare.js';
+import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
 export class PartnerAAdaptor implements PartnerAdaptor {
@@ -12,9 +14,10 @@ export class PartnerAAdaptor implements PartnerAdaptor {
     headers: Record<string, string | string[]>,
     rawBody: Buffer | string,
   ): Promise<WebhookValidationResult> {
-    const apiKey = headers['x-api-key'] || headers['X-API-KEY'];
+    const rawApiKey = headers['x-api-key'] || headers['X-API-KEY'];
+    const apiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : rawApiKey;
 
-    if (!apiKey || apiKey !== this.expectedApiKey) {
+    if (!apiKey || !safeCompare(apiKey, this.expectedApiKey)) {
       return { isValid: false, error: 'Unauthorized: Invalid API key' };
     }
 
@@ -62,8 +65,10 @@ export class PartnerAAdaptor implements PartnerAdaptor {
       rate_cents: update.priceInCents,
     };
 
-    const res = await fetch(`${this.partnerBaseUrl}/inventory`, {
+    const res = await fetchWithTimeout(`${this.partnerBaseUrl}/inventory`, {
       method: 'POST',
+      partnerSlug: this.partnerSlug,
+      timeoutMs: 10000,
       headers: {
         'content-type': 'application/json',
         'x-api-key': this.expectedApiKey,

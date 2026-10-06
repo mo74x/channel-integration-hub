@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
 import { PartnerAdaptor, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
 export class PartnerBAdaptor implements PartnerAdaptor {
@@ -19,8 +20,10 @@ export class PartnerBAdaptor implements PartnerAdaptor {
     const clientId = process.env.PARTNER_B_CLIENT_ID || 'client_b_channel_corp';
     const clientSecret = process.env.PARTNER_B_CLIENT_SECRET || 'secret_b_oauth_token_val';
 
-    const res = await fetch(`${this.partnerBaseUrl}/oauth/token`, {
+    const res = await fetchWithTimeout(`${this.partnerBaseUrl}/oauth/token`, {
       method: 'POST',
+      partnerSlug: this.partnerSlug,
+      timeoutMs: 10000,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         grant_type: 'client_credentials',
@@ -76,7 +79,9 @@ export class PartnerBAdaptor implements PartnerAdaptor {
     const token = await this.getValidAccessToken();
     const query = since ? `?since=${encodeURIComponent(since.toISOString())}` : '';
 
-    const res = await fetch(`${this.partnerBaseUrl}/reservations${query}`, {
+    const res = await fetchWithTimeout(`${this.partnerBaseUrl}/reservations${query}`, {
+      partnerSlug: this.partnerSlug,
+      timeoutMs: 10000,
       headers: {
         authorization: `Bearer ${token}`,
       },

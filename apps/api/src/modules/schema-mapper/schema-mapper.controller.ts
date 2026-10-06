@@ -1,7 +1,9 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { SchemaMapperService } from './schema-mapper.service.js';
+import { AdminApiKeyGuard } from '../../common/guards/admin-api-key.guard.js';
 
 @Controller('admin/schema-mapper')
+@UseGuards(AdminApiKeyGuard)
 export class SchemaMapperController {
   constructor(private readonly mapperService: SchemaMapperService) {}
 

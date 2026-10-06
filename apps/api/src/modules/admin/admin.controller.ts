@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Param, Query, } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { SyncJobStatus } from '@cih/database';
 import { AdminService } from './admin.service.js';
+import { AdminApiKeyGuard } from '../../common/guards/admin-api-key.guard.js';
 
 @Controller('admin')
+@UseGuards(AdminApiKeyGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -16,7 +18,8 @@ export class AdminController {
     @Query('status') status?: SyncJobStatus,
     @Query('take') take?: string,
   ) {
-    return this.adminService.getSyncJobs(status, take ? parseInt(take, 10) : 50);
+    const safeTake = Math.min(Math.max(1, parseInt(take || '50', 10) || 50), 100);
+    return this.adminService.getSyncJobs(status, safeTake);
   }
 
   @Post('jobs/:id/replay')
@@ -26,7 +29,8 @@ export class AdminController {
 
   @Get('reconciliation-logs')
   getReconciliationLogs(@Query('take') take?: string) {
-    return this.adminService.getReconciliationLogs(take ? parseInt(take, 10) : 50);
+    const safeTake = Math.min(Math.max(1, parseInt(take || '50', 10) || 50), 100);
+    return this.adminService.getReconciliationLogs(safeTake);
   }
 
   @Post('reconcile/:partnerSlug')
