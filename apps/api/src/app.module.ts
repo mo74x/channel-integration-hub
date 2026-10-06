@@ -9,6 +9,7 @@ import { AdaptorsModule } from './modules/adaptors/adaptors.module.js';
 import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
 import { SyncModule } from './modules/sync/sync.module.js';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module.js';
+import { AdminModule } from './modules/admin/admin.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ReconciliationModule } from './modules/reconciliation/reconciliation.mo
     ReservationsModule,
     SyncModule,
     ReconciliationModule,
+    AdminModule
   ],
   providers: [IdempotencyService],
   exports: [IdempotencyService],
