@@ -48,7 +48,10 @@ export default function DashboardPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const authHeaders = { 'x-api-key': API_KEY };
+      const authHeaders = {
+        'x-admin-api-key': API_KEY,
+        'x-api-key': API_KEY,
+      };
       const [pRes, jRes, rRes] = await Promise.all([
         fetch(`${API_URL}/admin/partners`, { headers: authHeaders }),
         fetch(`${API_URL}/admin/jobs?status=DEAD_LETTER`, { headers: authHeaders }),
@@ -74,7 +77,10 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${API_URL}/admin/jobs/${jobId}/replay`, {
         method: 'POST',
-        headers: { 'x-api-key': API_KEY },
+        headers: {
+          'x-admin-api-key': API_KEY,
+          'x-api-key': API_KEY,
+        },
       });
       if (res.ok) {
         await fetchData();

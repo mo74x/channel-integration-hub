@@ -12,6 +12,7 @@ import { SyncModule } from './modules/sync/sync.module.js';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { SchemaMapperModule } from './modules/schema-mapper/schema-mapper.module.js';
+import { HealthModule } from './modules/health/health.module.js';
 import { validateEnv } from './config/env.validation.js';
 
 @Module({
@@ -36,7 +37,8 @@ import { validateEnv } from './config/env.validation.js';
     SyncModule,
     ReconciliationModule,
     AdminModule,
-    SchemaMapperModule
+    SchemaMapperModule,
+    HealthModule,
   ],
   providers: [IdempotencyService],
   exports: [IdempotencyService],

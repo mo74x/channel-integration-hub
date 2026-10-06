@@ -27,6 +27,11 @@ describe('AdminApiKeyGuard', () => {
     } as unknown as ExecutionContext;
   }
 
+  it('allows access when valid x-admin-api-key header is provided', () => {
+    const context = createMockContext({ 'x-admin-api-key': 'test_secret_admin_key_12345' });
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
   it('allows access when valid x-api-key header is provided', () => {
     const context = createMockContext({ 'x-api-key': 'test_secret_admin_key_12345' });
     expect(guard.canActivate(context)).toBe(true);

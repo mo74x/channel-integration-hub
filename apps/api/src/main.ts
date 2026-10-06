@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { AppModule } from './app.module.js';
 
@@ -9,23 +10,13 @@ async function bootstrap() {
     rawBody: true, // Preserves raw buffer on requests for HMAC-SHA256 signature verification
   });
 
-  // Remove X-Powered-By header to prevent fingerprinting
-  const expressApp = app.getHttpAdapter().getInstance();
-  if (typeof expressApp?.disable === 'function') {
-    expressApp.disable('x-powered-by');
-  }
+  // Enable graceful shutdown hooks for container lifecycle & DB/Redis cleanup
+  app.enableShutdownHooks();
 
-  // Security Headers Middleware
-  app.use((_req: any, res: any, next: () => void) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '0');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    next();
-  });
+  // Helmet middleware for HTTP security headers
+  app.use(helmet());
 
-  // CORS Configuration
+  // CORS for the web dashboard and partner clients
   const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
     ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim())
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:4000'];
@@ -36,6 +27,7 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
+      'x-admin-api-key',
       'x-api-key',
       'X-API-KEY',
       'x-admin-key',
@@ -48,6 +40,7 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Global exception filter for standardized API error responses
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.useGlobalPipes(

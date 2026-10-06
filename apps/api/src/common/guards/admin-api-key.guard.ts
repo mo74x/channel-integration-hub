@@ -21,8 +21,11 @@ export class AdminApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('Admin authentication is misconfigured');
     }
 
-    // Support x-api-key, X-API-KEY, or Authorization: Bearer <key> / ApiKey <key>
-    const headerKey = request.headers['x-api-key'] || request.headers['x-admin-key'];
+    // Support x-admin-api-key, x-api-key, or Authorization: Bearer <key> / ApiKey <key>
+    const headerKey =
+      request.headers['x-admin-api-key'] ||
+      request.headers['x-api-key'] ||
+      request.headers['x-admin-key'];
     let providedKey = Array.isArray(headerKey) ? headerKey[0] : headerKey;
 
     if (!providedKey) {
