@@ -21,14 +21,14 @@ export class PartnerCAdaptor implements PartnerAdaptor {
       return { isValid: false, error: 'Missing HMAC signature, timestamp, or event-id headers' };
     }
 
-    // 1. Enforce replay attack window
+    // Enforce replay attack window
     const now = Math.floor(Date.now() / 1000);
     const sentTime = parseInt(timestamp, 10);
     if (isNaN(sentTime) || Math.abs(now - sentTime) > this.maxDriftSeconds) {
       return { isValid: false, error: 'Webhook rejected: Timestamp drift exceeded 300 seconds' };
     }
 
-    // 2. Validate cryptographic signature using constant-time comparison
+    // Validate cryptographic signature using constant-time comparison
     const rawBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody);
     const expectedSignature = createHmac('sha256', this.hmacSecret)
       .update(`${timestamp}.${rawBuffer.toString('utf-8')}`)

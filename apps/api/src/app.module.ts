@@ -7,6 +7,8 @@ import { InventoryModule } from './modules/inventory/inventory.module.js';
 import { ReservationsModule } from './modules/reservations/reservations.module.js';
 import { AdaptorsModule } from './modules/adaptors/adaptors.module.js';
 import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
+import { SyncModule } from './modules/sync/sync.module.js';
+import { ReconciliationModule } from './modules/reconciliation/reconciliation.module.js';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
     AdaptorsModule,
     WebhooksModule,
     ReservationsModule,
+    SyncModule,
+    ReconciliationModule,
   ],
   providers: [IdempotencyService],
   exports: [IdempotencyService],
