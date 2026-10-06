@@ -1,6 +1,6 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError, DelayedError } from 'bullmq';
 import { prisma, SyncJobStatus } from '@cih/database';
 import { CanonicalInventoryPushPayload } from '@cih/shared';
 import { SYNC_QUEUES } from '../sync.constants.js';
@@ -36,7 +36,14 @@ export class OutboundSyncProcessor extends WorkerHost {
     // 1. Circuit Breaker validation
     const allowed = await this.circuitBreaker.canExecute(partnerSlug);
     if (!allowed) {
-      throw new Error(`Circuit OPEN for partner ${partnerSlug}. Delaying/failing sync job execution.`);
+      this.logger.warn(
+        `Circuit OPEN for partner ${partnerSlug}. Delaying sync job ${syncJobId} instead of burning a retry.`,
+      );
+      const delayMs = 10000;
+      if (typeof job.moveToDelayed === 'function') {
+        await job.moveToDelayed(Date.now() + delayMs, job.token);
+      }
+      throw new DelayedError();
     }
 
     // 2. Mark database record as PROCESSING
@@ -65,7 +72,37 @@ export class OutboundSyncProcessor extends WorkerHost {
       this.logger.log(`Outbound sync completed for ${partnerSlug} (Job ${syncJobId})`);
       return response;
     } catch (error: any) {
-      // Record failure with circuit breaker
+      const status =
+        error?.status ??
+        error?.statusCode ??
+        error?.response?.status ??
+        (typeof error?.message === 'string' && error.message.match(/status (\d{3})/i)
+          ? parseInt(error.message.match(/status (\d{3})/i)![1], 10)
+          : undefined);
+
+      const is4xx = typeof status === 'number' && status >= 400 && status < 500;
+
+      if (is4xx) {
+        this.logger.error(
+          `Unrecoverable 4xx client error (${status}) from partner ${partnerSlug} for Job ${syncJobId}: ${error.message}. Moving straight to DLQ without tripping circuit.`,
+        );
+
+        // Update database record straight to DLQ (DEAD_LETTER) without tripping the circuit
+        await prisma.syncJob.update({
+          where: { id: syncJobId },
+          data: {
+            status: SyncJobStatus.DEAD_LETTER,
+            lastError: `4xx Unrecoverable (${status}): ${error.message || 'Client error'}`,
+          },
+        });
+
+        // Throw BullMQ UnrecoverableError so BullMQ does not retry
+        throw new UnrecoverableError(
+          `4xx client error (${status}) from ${partnerSlug}: ${error.message}`,
+        );
+      }
+
+      // Record failure with circuit breaker for non-4xx errors (transient / 5xx / timeouts)
       await this.circuitBreaker.recordFailure(partnerSlug);
 
       // Persist interim error details for visibility
@@ -85,22 +122,31 @@ export class OutboundSyncProcessor extends WorkerHost {
   }
 
   /**
-   * DLQ Hook: Triggered once all 5 retry attempts are exhausted[cite: 1].
+   * DLQ Hook: Triggered when job fails permanently (exhausted retries or UnrecoverableError).
    */
   @OnWorkerEvent('failed')
   async onJobFailed(job: Job<OutboundInventoryJobData>, error: Error) {
-    if (job.attemptsMade >= (job.opts.attempts || 5)) {
+    const isUnrecoverable =
+      error instanceof UnrecoverableError ||
+      error?.name === 'UnrecoverableError';
+    const exhaustedRetries = job.attemptsMade >= (job.opts?.attempts || 5);
+
+    if (isUnrecoverable || exhaustedRetries) {
       this.logger.error(
-        `CRITICAL: Job ${job.id} for partner ${job.data.partnerSlug} exceeded all retry attempts. Moving to DEAD_LETTER.`,
+        `CRITICAL: Job ${job.id} for partner ${job.data?.partnerSlug} failed (${isUnrecoverable ? 'UnrecoverableError' : 'Exhausted retries'}). Moving to DEAD_LETTER.`,
       );
 
-      await prisma.syncJob.update({
-        where: { id: job.data.syncJobId },
-        data: {
-          status: SyncJobStatus.DEAD_LETTER,
-          lastError: `Exhausted retries: ${error.message}`,
-        },
-      });
+      if (job.data?.syncJobId) {
+        await prisma.syncJob.update({
+          where: { id: job.data.syncJobId },
+          data: {
+            status: SyncJobStatus.DEAD_LETTER,
+            lastError: isUnrecoverable
+              ? `Unrecoverable error: ${error.message}`
+              : `Exhausted retries: ${error.message}`,
+          },
+        });
+      }
     }
   }
-}
+}

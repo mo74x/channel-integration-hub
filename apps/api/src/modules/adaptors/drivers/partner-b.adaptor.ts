@@ -1,24 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
-import { PartnerAdaptor, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
 import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
 export class PartnerBAdaptor implements PartnerAdaptor {
   readonly partnerSlug = 'partner_b';
-  private readonly partnerBaseUrl = 'http://localhost:4000/partner-b';
+  readonly capabilities: PartnerCapabilities = {
+    webhooks: false,
+    polling: true,
+    inventoryPush: false,
+  };
 
   private cachedToken: string | null = null;
   private tokenExpiresAt: number = 0;
+
+  constructor(
+    @Optional()
+    private readonly configService?: ConfigService,
+  ) {}
+
+  private get partnerBaseUrl(): string {
+    return (
+      this.configService?.get<string>('PARTNER_B_BASE_URL') ||
+      process.env.PARTNER_B_BASE_URL ||
+      'http://localhost:4000/partner-b'
+    );
+  }
+
+  private get clientId(): string {
+    return (
+      this.configService?.get<string>('PARTNER_B_CLIENT_ID') ||
+      process.env.PARTNER_B_CLIENT_ID ||
+      'client_b_channel_corp'
+    );
+  }
+
+  private get clientSecret(): string {
+    return (
+      this.configService?.get<string>('PARTNER_B_CLIENT_SECRET') ||
+      process.env.PARTNER_B_CLIENT_SECRET ||
+      'secret_b_oauth_token_val'
+    );
+  }
 
   private async getValidAccessToken(): Promise<string> {
     const now = Date.now();
     if (this.cachedToken && now < this.tokenExpiresAt - 60000) {
       return this.cachedToken;
     }
-
-    const clientId = process.env.PARTNER_B_CLIENT_ID || 'client_b_channel_corp';
-    const clientSecret = process.env.PARTNER_B_CLIENT_SECRET || 'secret_b_oauth_token_val';
 
     const res = await fetchWithTimeout(`${this.partnerBaseUrl}/oauth/token`, {
       method: 'POST',
@@ -27,8 +58,8 @@ export class PartnerBAdaptor implements PartnerAdaptor {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
       }),
     });
 

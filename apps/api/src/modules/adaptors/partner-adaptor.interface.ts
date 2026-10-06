@@ -1,5 +1,11 @@
 import { CanonicalReservationPayload, CanonicalInventoryPushPayload } from '@cih/shared';
 
+export interface PartnerCapabilities {
+  webhooks: boolean;
+  polling: boolean;
+  inventoryPush: boolean;
+}
+
 export interface WebhookValidationResult {
   isValid: boolean;
   idempotencyKey?: string;
@@ -9,6 +15,7 @@ export interface WebhookValidationResult {
 
 export interface PartnerAdaptor {
   readonly partnerSlug: string;
+  readonly capabilities: PartnerCapabilities;
 
   /**
    * Validates authenticity (HMAC signature, Bearer token, or API Key).

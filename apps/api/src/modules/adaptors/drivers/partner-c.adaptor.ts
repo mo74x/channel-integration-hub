@@ -1,14 +1,41 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
-import { PartnerAdaptor, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
 import { safeCompare } from '../../../common/crypto/safe-compare.js';
+import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
 export class PartnerCAdaptor implements PartnerAdaptor {
   readonly partnerSlug = 'partner_c';
-  private readonly hmacSecret = process.env.PARTNER_C_HMAC_SECRET || 'c8f126f5e92be2b1a8f940821d3e86f8';
+  readonly capabilities: PartnerCapabilities = {
+    webhooks: true,
+    polling: false,
+    inventoryPush: false,
+  };
   private readonly maxDriftSeconds = 300; // 5-minute replay attack threshold
+
+  constructor(
+    @Optional()
+    private readonly configService?: ConfigService,
+  ) {}
+
+  private get hmacSecret(): string {
+    return (
+      this.configService?.get<string>('PARTNER_C_HMAC_SECRET') ||
+      process.env.PARTNER_C_HMAC_SECRET ||
+      'c8f126f5e92be2b1a8f940821d3e86f8'
+    );
+  }
+
+  private get partnerBaseUrl(): string {
+    return (
+      this.configService?.get<string>('PARTNER_C_BASE_URL') ||
+      process.env.PARTNER_C_BASE_URL ||
+      'http://localhost:4000/partner-c'
+    );
+  }
 
   async verifyWebhook(
     headers: Record<string, string | string[]>,

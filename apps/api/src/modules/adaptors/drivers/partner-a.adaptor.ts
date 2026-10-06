@@ -1,14 +1,39 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ReservationStatus, CanonicalInventoryPushPayload, CanonicalReservationPayload } from '@cih/shared';
-import { PartnerAdaptor, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
 import { safeCompare } from '../../../common/crypto/safe-compare.js';
 import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
 export class PartnerAAdaptor implements PartnerAdaptor {
   readonly partnerSlug = 'partner_a';
-  private readonly expectedApiKey = process.env.PARTNER_A_API_KEY || 'cih_live_partner_a_key_98765';
-  private readonly partnerBaseUrl = 'http://localhost:4000/partner-a';
+  readonly capabilities: PartnerCapabilities = {
+    webhooks: true,
+    polling: false,
+    inventoryPush: true,
+  };
+
+  constructor(
+    @Optional()
+    private readonly configService?: ConfigService,
+  ) {}
+
+  private get expectedApiKey(): string {
+    return (
+      this.configService?.get<string>('PARTNER_A_API_KEY') ||
+      process.env.PARTNER_A_API_KEY ||
+      'cih_live_partner_a_key_98765'
+    );
+  }
+
+  private get partnerBaseUrl(): string {
+    return (
+      this.configService?.get<string>('PARTNER_A_BASE_URL') ||
+      process.env.PARTNER_A_BASE_URL ||
+      'http://localhost:4000/partner-a'
+    );
+  }
 
   async verifyWebhook(
     headers: Record<string, string | string[]>,

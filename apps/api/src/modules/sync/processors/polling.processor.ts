@@ -18,69 +18,71 @@ export class PollingProcessor extends WorkerHost {
   }
 
   async process(): Promise<void> {
-    const partnerSlug = 'partner_b';
-    const adaptor = this.adaptors.get(partnerSlug);
-    if (!adaptor) return;
+    const capableAdaptors = Array.from(this.adaptors.values()).filter(
+      (adaptor) => adaptor.capabilities?.polling,
+    );
 
-    const partner = await prisma.partner.findUnique({
-      where: { slug: partnerSlug },
-    });
-    if (!partner || partner.status !== 'ACTIVE') return;
+    for (const adaptor of capableAdaptors) {
+      const partner = await prisma.partner.findUnique({
+        where: { slug: adaptor.partnerSlug },
+      });
+      if (!partner || partner.status !== 'ACTIVE') continue;
 
-    this.logger.log(`Running scheduled reservations poll for ${partner.name}...`);
+      this.logger.log(`Running scheduled reservations poll for ${partner.name} (${adaptor.partnerSlug})...`);
 
-    // 1. Fetch property mapping for Partner B
-    const mappings = await prisma.propertyPartnerMapping.findMany({
-      where: { partnerId: partner.id },
-    });
+      // 1. Fetch property mapping for Partner
+      const mappings = await prisma.propertyPartnerMapping.findMany({
+        where: { partnerId: partner.id },
+      });
 
-    for (const mapping of mappings) {
-      try {
-        // Query changes in the last 2 hours
-        const since = new Date(Date.now() - 2 * 60 * 60 * 1000);
-        const remoteReservations = await adaptor.pullReservations(mapping.externalPropertyId, since);
+      for (const mapping of mappings) {
+        try {
+          // Query changes in the last 2 hours
+          const since = new Date(Date.now() - 2 * 60 * 60 * 1000);
+          const remoteReservations = await adaptor.pullReservations(mapping.externalPropertyId, since);
 
-        for (const remote of remoteReservations) {
-          // Ingest polled reservations through state machine
-          await this.stateMachineService.processTransition({
-            partnerId: partner.id,
-            externalBookingId: remote.externalBookingId,
-            targetStatus: remote.status,
-            propertyId: mapping.propertyId,
-            inventoryUnitCode: remote.inventoryUnitCode,
-            checkInDate: remote.checkInDate,
-            checkOutDate: remote.checkOutDate,
-            unitsBooked: remote.unitsBooked,
-            guestName: remote.guestName,
-            guestEmail: remote.guestEmail,
-            totalPriceCents: remote.totalPriceCents,
-            currency: remote.currency,
-            rawPayload: remote.metadata,
+          for (const remote of remoteReservations) {
+            // Ingest polled reservations through state machine
+            await this.stateMachineService.processTransition({
+              partnerId: partner.id,
+              externalBookingId: remote.externalBookingId,
+              targetStatus: remote.status,
+              propertyId: mapping.propertyId,
+              inventoryUnitCode: remote.inventoryUnitCode,
+              checkInDate: remote.checkInDate,
+              checkOutDate: remote.checkOutDate,
+              unitsBooked: remote.unitsBooked,
+              guestName: remote.guestName,
+              guestEmail: remote.guestEmail,
+              totalPriceCents: remote.totalPriceCents,
+              currency: remote.currency,
+              rawPayload: remote.metadata,
+            });
+          }
+
+          // Record successful poll execution
+          await prisma.syncJob.create({
+            data: {
+              partnerId: partner.id,
+              jobType: SyncJobType.SCHEDULED_POLL,
+              entityType: 'RESERVATION',
+              status: SyncJobStatus.COMPLETED,
+              payload: { pulledCount: remoteReservations.length, externalPropertyId: mapping.externalPropertyId },
+            },
+          });
+        } catch (error: any) {
+          this.logger.error(`Error polling ${partner.name} for property ${mapping.propertyId}:`, error);
+          await prisma.syncJob.create({
+            data: {
+              partnerId: partner.id,
+              jobType: SyncJobType.SCHEDULED_POLL,
+              entityType: 'RESERVATION',
+              status: SyncJobStatus.FAILED,
+              lastError: error.message,
+              payload: { externalPropertyId: mapping.externalPropertyId },
+            },
           });
         }
-
-        // Record successful poll execution
-        await prisma.syncJob.create({
-          data: {
-            partnerId: partner.id,
-            jobType: SyncJobType.SCHEDULED_POLL,
-            entityType: 'RESERVATION',
-            status: SyncJobStatus.COMPLETED,
-            payload: { pulledCount: remoteReservations.length, externalPropertyId: mapping.externalPropertyId },
-          },
-        });
-      } catch (error: any) {
-        this.logger.error(`Error polling Partner B for property ${mapping.propertyId}:`, error);
-        await prisma.syncJob.create({
-          data: {
-            partnerId: partner.id,
-            jobType: SyncJobType.SCHEDULED_POLL,
-            entityType: 'RESERVATION',
-            status: SyncJobStatus.FAILED,
-            lastError: error.message,
-            payload: { externalPropertyId: mapping.externalPropertyId },
-          },
-        });
       }
     }
   }
