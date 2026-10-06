@@ -10,6 +10,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
 import { SyncModule } from './modules/sync/sync.module.js';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { SchemaMapperModule } from './modules/schema-mapper/schema-mapper.module.js';
 
 @Module({
   imports: [
@@ -31,7 +32,8 @@ import { AdminModule } from './modules/admin/admin.module.js';
     ReservationsModule,
     SyncModule,
     ReconciliationModule,
-    AdminModule
+    AdminModule,
+    SchemaMapperModule
   ],
   providers: [IdempotencyService],
   exports: [IdempotencyService],
