@@ -5,6 +5,9 @@ node_modules/
 # Build outputs
 dist/
 build/
+out/
+.next/
+.turbo/
 *.tsbuildinfo
 
 # Environment variables
@@ -26,6 +29,21 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# AI Agents & CLI Skills (e.g. Prisma agent skills)
+.agents/
+.claude/
+.windsurf/
+.skills/
+skills-lock.json
+
+# Local Databases & Backups
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
 
 # Testing & Coverage
 coverage/
