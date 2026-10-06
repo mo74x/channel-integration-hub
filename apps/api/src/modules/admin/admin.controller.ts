@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, ParseIntPipe, Optional } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, } from '@nestjs/common';
 import { SyncJobStatus } from '@cih/database';
 import { AdminService } from './admin.service.js';
 
