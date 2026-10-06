@@ -136,4 +136,110 @@ describe('ReservationStateMachineService', () => {
     expect(mockInventoryService.bookInventoryUnits).not.toHaveBeenCalled();
     expect(prisma.reservation.update).not.toHaveBeenCalled();
   });
+
+  it('should restore inventory if reservation insertion fails after inventory booking', async () => {
+    (prisma.reservation.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.reservation.create as jest.Mock).mockRejectedValue(new Error('DB Constraint Violation'));
+
+    await expect(
+      service.processTransition({
+        partnerId: 'partner-uuid-1',
+        externalBookingId: 'BOOK-FAIL',
+        targetStatus: ReservationStatus.CONFIRMED,
+        propertyId: 'prop-uuid-1',
+        inventoryUnitCode: 'DELUXE_KING',
+        checkInDate: '2026-11-10',
+        checkOutDate: '2026-11-12',
+        unitsBooked: 1,
+        guestName: 'Jane Doe',
+      }),
+    ).rejects.toThrow('DB Constraint Violation');
+
+    expect(mockInventoryService.bookInventoryUnits).toHaveBeenCalled();
+    expect(mockInventoryService.restoreInventoryUnits).toHaveBeenCalledWith(
+      'unit-uuid-1',
+      '2026-11-10',
+      '2026-11-12',
+      1,
+    );
+  });
+
+  it('should emit reservation.inventory-changed domain event upon confirmation and cancellation', async () => {
+    const mockEmitter = { emit: jest.fn() };
+    const stateMachine = new ReservationStateMachineService(
+      mockInventoryService as InventoryService,
+      mockEmitter as any,
+    );
+
+    // 1. Confirm
+    (prisma.reservation.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.reservation.create as jest.Mock).mockResolvedValue({
+      id: 'res-999',
+      partnerId: 'partner-1',
+      propertyId: 'prop-1',
+      inventoryUnitId: 'unit-uuid-1',
+      status: 'CONFIRMED',
+      unitsBooked: 1,
+    });
+
+    await stateMachine.processTransition({
+      partnerId: 'partner-1',
+      externalBookingId: 'BOOK-EVT',
+      targetStatus: ReservationStatus.CONFIRMED,
+      propertyId: 'prop-1',
+      inventoryUnitCode: 'DELUXE_KING',
+      checkInDate: '2026-11-10',
+      checkOutDate: '2026-11-12',
+      unitsBooked: 1,
+      guestName: 'Jane Doe',
+    });
+
+    expect(mockEmitter.emit).toHaveBeenCalledWith(
+      'reservation.inventory-changed',
+      expect.objectContaining({
+        reservationId: 'res-999',
+        action: 'CONFIRMED',
+      }),
+    );
+
+    // 2. Cancel
+    (prisma.reservation.findUnique as jest.Mock).mockResolvedValue({
+      id: 'res-999',
+      partnerId: 'partner-1',
+      propertyId: 'prop-1',
+      inventoryUnitId: 'unit-uuid-1',
+      status: 'CONFIRMED',
+      checkInDate: new Date('2026-11-10'),
+      checkOutDate: new Date('2026-11-12'),
+      unitsBooked: 1,
+    });
+    (prisma.reservation.update as jest.Mock).mockResolvedValue({
+      id: 'res-999',
+      partnerId: 'partner-1',
+      propertyId: 'prop-1',
+      inventoryUnitId: 'unit-uuid-1',
+      status: 'CANCELLED',
+      unitsBooked: 1,
+    });
+
+    await stateMachine.processTransition({
+      partnerId: 'partner-1',
+      externalBookingId: 'BOOK-EVT',
+      targetStatus: ReservationStatus.CANCELLED,
+      propertyId: 'prop-1',
+      inventoryUnitCode: 'DELUXE_KING',
+      checkInDate: '2026-11-10',
+      checkOutDate: '2026-11-12',
+      unitsBooked: 1,
+      guestName: 'Jane Doe',
+    });
+
+    expect(mockEmitter.emit).toHaveBeenCalledWith(
+      'reservation.inventory-changed',
+      expect.objectContaining({
+        reservationId: 'res-999',
+        action: 'CANCELLED',
+      }),
+    );
+  });
 });

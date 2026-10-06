@@ -26,6 +26,10 @@ export const envSchema = z.object({
   PARTNER_B_BASE_URL: z.string().url().default('http://localhost:4000/partner-b'),
   PARTNER_C_HMAC_SECRET: z.string().min(1).default('c8f126f5e92be2b1a8f940821d3e86f8'),
 
+  // Circuit Breaker
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
+  CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(30000),
+
   // External APIs
   OPENAI_API_KEY: z.string().optional(),
 })

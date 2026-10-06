@@ -1,7 +1,10 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
+import { EventEmitter } from 'node:events';
 import { ReservationStatus } from '@cih/shared';
 import { prisma } from '@cih/database';
 import { InventoryService } from '../inventory/inventory.service.js';
+
+export const domainEventEmitter = new EventEmitter();
 
 export interface TransitionRequest {
   partnerId: string;
@@ -19,6 +22,17 @@ export interface TransitionRequest {
   rawPayload?: unknown;
 }
 
+export interface ReservationInventoryChangedEvent {
+  reservationId: string;
+  partnerId: string;
+  propertyId: string;
+  inventoryUnitId: string;
+  action: 'CONFIRMED' | 'CANCELLED';
+  unitsBooked: number;
+  checkInDate: string;
+  checkOutDate: string;
+}
+
 @Injectable()
 export class ReservationStateMachineService {
   private readonly logger = new Logger(ReservationStateMachineService.name);
@@ -34,7 +48,10 @@ export class ReservationStateMachineService {
     [ReservationStatus.REJECTED]: [],  // Terminal state
   };
 
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(
+    private readonly inventoryService: InventoryService,
+    @Optional() private readonly events: EventEmitter = domainEventEmitter,
+  ) {}
 
   async processTransition(req: TransitionRequest) {
     const existing = await prisma.reservation.findUnique({
@@ -77,24 +94,54 @@ export class ReservationStateMachineService {
           req.unitsBooked,
         );
 
-        return await prisma.reservation.create({
-          data: {
-            partnerId: req.partnerId,
-            externalBookingId: req.externalBookingId,
-            propertyId: req.propertyId,
-            inventoryUnitId: bookingResult.inventoryUnitId,
-            status: 'CONFIRMED',
-            checkInDate: new Date(req.checkInDate),
-            checkOutDate: new Date(req.checkOutDate),
-            unitsBooked: req.unitsBooked,
-            guestName: req.guestName,
-            guestEmail: req.guestEmail,
-            totalPriceCents: req.totalPriceCents ?? bookingResult.totalPriceCents,
-            currency: req.currency || 'USD',
-            rawPayload: req.rawPayload as object,
-            version: 1,
-          },
+        let created;
+        try {
+          created = await prisma.reservation.create({
+            data: {
+              partnerId: req.partnerId,
+              externalBookingId: req.externalBookingId,
+              propertyId: req.propertyId,
+              inventoryUnitId: bookingResult.inventoryUnitId,
+              status: 'CONFIRMED',
+              checkInDate: new Date(req.checkInDate),
+              checkOutDate: new Date(req.checkOutDate),
+              unitsBooked: req.unitsBooked,
+              guestName: req.guestName,
+              guestEmail: req.guestEmail,
+              totalPriceCents: req.totalPriceCents ?? bookingResult.totalPriceCents,
+              currency: req.currency || 'USD',
+              rawPayload: req.rawPayload as object,
+              version: 1,
+            },
+          });
+        } catch (insertError) {
+          // Restore booked inventory if reservation insertion fails
+          this.logger.error(
+            `Failed inserting reservation ${req.externalBookingId} after inventory was booked. Restoring inventory...`,
+            insertError,
+          );
+          await this.inventoryService.restoreInventoryUnits(
+            bookingResult.inventoryUnitId,
+            req.checkInDate,
+            req.checkOutDate,
+            req.unitsBooked,
+          );
+          throw insertError;
+        }
+
+        // Emit domain event for confirmed reservation
+        this.events.emit('reservation.inventory-changed', {
+          reservationId: created.id,
+          partnerId: created.partnerId,
+          propertyId: created.propertyId,
+          inventoryUnitId: created.inventoryUnitId,
+          action: 'CONFIRMED',
+          unitsBooked: created.unitsBooked,
+          checkInDate: req.checkInDate,
+          checkOutDate: req.checkOutDate,
         });
+
+        return created;
       }
 
       // Record non-confirmed initial bookings without decrementing inventory
@@ -139,7 +186,7 @@ export class ReservationStateMachineService {
         existing.unitsBooked,
       );
 
-      return await prisma.reservation.update({
+      const updated = await prisma.reservation.update({
         where: { id: existing.id },
         data: {
           status: 'CANCELLED',
@@ -147,9 +194,74 @@ export class ReservationStateMachineService {
           rawPayload: (req.rawPayload as object) ?? existing.rawPayload,
         },
       });
+
+      // Emit domain event for cancelled reservation
+      this.events.emit('reservation.inventory-changed', {
+        reservationId: updated.id,
+        partnerId: updated.partnerId,
+        propertyId: updated.propertyId,
+        inventoryUnitId: updated.inventoryUnitId,
+        action: 'CANCELLED',
+        unitsBooked: updated.unitsBooked,
+        checkInDate: existing.checkInDate.toISOString().slice(0, 10),
+        checkOutDate: existing.checkOutDate.toISOString().slice(0, 10),
+      });
+
+      return updated;
     }
 
-    // 5. Apply any other legal transition
+    // 5. Handle PENDING -> CONFIRMED transition
+    if (
+      (existing.status as unknown as ReservationStatus) === ReservationStatus.PENDING &&
+      req.targetStatus === ReservationStatus.CONFIRMED
+    ) {
+      const checkInStr = req.checkInDate || existing.checkInDate.toISOString().slice(0, 10);
+      const checkOutStr = req.checkOutDate || existing.checkOutDate.toISOString().slice(0, 10);
+      const units = req.unitsBooked || existing.unitsBooked;
+
+      const bookingResult = await this.inventoryService.bookInventoryUnits(
+        existing.propertyId,
+        req.inventoryUnitCode,
+        checkInStr,
+        checkOutStr,
+        units,
+      );
+
+      let updated;
+      try {
+        updated = await prisma.reservation.update({
+          where: { id: existing.id },
+          data: {
+            status: 'CONFIRMED',
+            version: { increment: 1 },
+            rawPayload: (req.rawPayload as object) ?? existing.rawPayload,
+          },
+        });
+      } catch (updateError) {
+        await this.inventoryService.restoreInventoryUnits(
+          bookingResult.inventoryUnitId,
+          checkInStr,
+          checkOutStr,
+          units,
+        );
+        throw updateError;
+      }
+
+      this.events.emit('reservation.inventory-changed', {
+        reservationId: updated.id,
+        partnerId: updated.partnerId,
+        propertyId: updated.propertyId,
+        inventoryUnitId: updated.inventoryUnitId,
+        action: 'CONFIRMED',
+        unitsBooked: updated.unitsBooked,
+        checkInDate: checkInStr,
+        checkOutDate: checkOutStr,
+      });
+
+      return updated;
+    }
+
+    // 6. Apply any other legal transition
     return await prisma.reservation.update({
       where: { id: existing.id },
       data: {

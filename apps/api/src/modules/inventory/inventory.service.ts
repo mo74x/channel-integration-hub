@@ -26,6 +26,41 @@ export class InventoryService {
   }
 
   /**
+   * Executes an action under distributed locks for all dates in the range,
+   * sorted lexicographically to prevent deadlocks across concurrent requests.
+   */
+  private async withInventoryLocks<T>(
+    inventoryUnitId: string,
+    dates: Date[],
+    action: () => Promise<T>,
+  ): Promise<T> {
+    const lockKeys = dates
+      .map((d) => `inventory:${inventoryUnitId}:${d.toISOString().slice(0, 10)}`)
+      .sort();
+
+    const acquiredLocks: { token: string; key: string }[] = [];
+
+    try {
+      for (const key of lockKeys) {
+        const lock = await this.lockService.acquireLock(key, 8000, 12, 100);
+        if (!lock) {
+          throw new BadRequestException(
+            `Concurrency timeout while locking inventory for unit ${inventoryUnitId}`,
+          );
+        }
+        acquiredLocks.push(lock);
+      }
+
+      return await action();
+    } finally {
+      // Release in reverse acquisition order
+      for (const lock of acquiredLocks.reverse()) {
+        await this.lockService.releaseLock(lock);
+      }
+    }
+  }
+
+  /**
    * Decrements available units across the date range using distributed locking.
    */
   async bookInventoryUnits(
@@ -50,22 +85,7 @@ export class InventoryService {
       throw new BadRequestException(`Unit ${inventoryUnitCode} does not exist for property ${propertyId}`);
     }
 
-    // Sort keys alphabetically to guarantee deadlocks cannot occur across intersecting dates
-    const lockKeys = dates
-      .map((d) => `inventory:${unit.id}:${d.toISOString().slice(0, 10)}`)
-      .sort();
-
-    const acquiredLocks: { token: string; key: string }[] = [];
-
-    try {
-      for (const key of lockKeys) {
-        const lock = await this.lockService.acquireLock(key, 8000, 12, 100);
-        if (!lock) {
-          throw new BadRequestException(`Concurrency timeout while locking inventory for unit ${unit.id}`);
-        }
-        acquiredLocks.push(lock);
-      }
-
+    return await this.withInventoryLocks(unit.id, dates, async () => {
       return await prisma.$transaction(async (tx) => {
         let totalCalculatedCents = 0;
 
@@ -112,16 +132,11 @@ export class InventoryService {
           inventoryUnitId: unit.id,
         };
       });
-    } finally {
-      // Release in reverse acquisition order
-      for (const lock of acquiredLocks.reverse()) {
-        await this.lockService.releaseLock(lock);
-      }
-    }
+    });
   }
 
   /**
-   * Restores inventory units when a booking is cancelled.
+   * Restores inventory units when a booking is cancelled, acquiring the same sorted per-date locks.
    */
   async restoreInventoryUnits(
     inventoryUnitId: string,
@@ -131,25 +146,27 @@ export class InventoryService {
   ): Promise<void> {
     const dates = this.generateDateRange(checkInDate, checkOutDate);
 
-    await prisma.$transaction(async (tx) => {
-      for (const date of dates) {
-        await tx.inventoryCalendar.update({
-          where: {
-            inventoryUnitId_date: {
-              inventoryUnitId,
-              date,
+    await this.withInventoryLocks(inventoryUnitId, dates, async () => {
+      await prisma.$transaction(async (tx) => {
+        for (const date of dates) {
+          await tx.inventoryCalendar.update({
+            where: {
+              inventoryUnitId_date: {
+                inventoryUnitId,
+                date,
+              },
             },
-          },
-          data: {
-            availableUnits: { increment: unitsToRestore },
-            version: { increment: 1 },
-          },
-        });
-      }
-    });
+            data: {
+              availableUnits: { increment: unitsToRestore },
+              version: { increment: 1 },
+            },
+          });
+        }
+      });
 
-    this.logger.log(
-      `Restored ${unitsToRestore} unit(s) for unit ${inventoryUnitId} from ${checkInDate} to ${checkOutDate}`,
-    );
+      this.logger.log(
+        `Restored ${unitsToRestore} unit(s) for unit ${inventoryUnitId} from ${checkInDate} to ${checkOutDate}`,
+      );
+    });
   }
 }
