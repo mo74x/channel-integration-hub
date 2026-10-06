@@ -1,0 +1,44 @@
+name: CI Suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Shared Types
+        run: pnpm --filter @cih/shared build
+
+      - name: Run Prisma Generate
+        run: pnpm --filter @cih/database generate
+
+      - name: Typecheck Applications
+        run: |
+          pnpm --filter @cih/api exec tsc --noEmit
+          pnpm --filter @cih/mock-partners exec tsc --noEmit
+
+      - name: Run Jest Unit Tests
+        run: pnpm --filter @cih/api test
+
+      - name: Build Docker Image
+        run: docker build -t cih-api:test -f apps/api/Dockerfile .
