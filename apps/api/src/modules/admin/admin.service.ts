@@ -129,4 +129,14 @@ export class AdminService {
     const driftCount = await this.reconciliationService.reconcilePartnerReservations(partnerSlug);
     return { partnerSlug, driftDetected: driftCount };
   }
+
+  /**
+   * Resolves a drift log by applying operator resolution action.
+   */
+  async resolveReconciliationLog(
+    id: string,
+    action: 'ACCEPT_PARTNER' | 'KEEP_CANONICAL' | 'DISMISS',
+  ) {
+    return this.reconciliationService.resolveDriftLog(id, action);
+  }
 }
