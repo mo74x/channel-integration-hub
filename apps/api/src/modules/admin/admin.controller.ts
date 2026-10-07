@@ -2,13 +2,14 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Query,
   Body,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import { SyncJobStatus } from '@cih/database';
+import { SyncJobStatus, PartnerStatus } from '@cih/database';
 import { AdminService } from './admin.service.js';
 import { AdminApiKeyGuard } from '../../common/guards/admin-api-key.guard.js';
 
@@ -20,6 +21,19 @@ export class AdminController {
   @Get('partners')
   getPartners() {
     return this.adminService.getPartnersOverview();
+  }
+
+  @Post('partners/:slug/circuit/reset')
+  resetPartnerCircuit(@Param('slug') slug: string) {
+    return this.adminService.resetPartnerCircuit(slug);
+  }
+
+  @Patch('partners/:slug')
+  updatePartnerStatus(
+    @Param('slug') slug: string,
+    @Body() body: { enabled?: boolean; status?: PartnerStatus; active?: boolean; disabled?: boolean },
+  ) {
+    return this.adminService.updatePartnerStatus(slug, body);
   }
 
   @Get('jobs')

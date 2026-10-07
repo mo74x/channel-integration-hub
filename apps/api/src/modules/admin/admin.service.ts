@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { prisma, SyncJobStatus, SyncJobType } from '@cih/database';
+import { prisma, SyncJobStatus, SyncJobType, PartnerStatus } from '@cih/database';
 import { CircuitBreakerService } from '../../common/circuit-breaker/circuit-breaker.service.js';
 import { SYNC_QUEUES, SYNC_JOBS } from '../sync/sync.constants.js';
 import { ReconciliationService } from '../reconciliation/reconciliation.service.js';
@@ -138,5 +138,108 @@ export class AdminService {
     action: 'ACCEPT_PARTNER' | 'KEEP_CANONICAL' | 'DISMISS',
   ) {
     return this.reconciliationService.resolveDriftLog(id, action);
+  }
+
+  /**
+   * Resets the circuit breaker state to CLOSED and clears failure counters for a partner.
+   */
+  async resetPartnerCircuit(partnerSlug: string) {
+    const partner = await prisma.partner.findUnique({
+      where: { slug: partnerSlug },
+    });
+
+    if (!partner) {
+      throw new NotFoundException(`Partner with slug '${partnerSlug}' not found`);
+    }
+
+    await this.circuitBreaker.forceReset(partnerSlug);
+
+    // If partner was marked as CIRCUIT_OPEN in DB, restore to ACTIVE
+    let currentStatus = partner.status;
+    if (partner.status === PartnerStatus.CIRCUIT_OPEN) {
+      const updated = await prisma.partner.update({
+        where: { id: partner.id },
+        data: { status: PartnerStatus.ACTIVE },
+      });
+      currentStatus = updated.status;
+    }
+
+    const circuitStatus = await this.circuitBreaker.getStatus(partnerSlug);
+
+    this.logger.log(`Circuit breaker reset for partner '${partnerSlug}' (Status: ${currentStatus})`);
+    return {
+      success: true,
+      partnerSlug,
+      partnerStatus: currentStatus,
+      circuitState: circuitStatus.state,
+      consecutiveFailures: circuitStatus.consecutiveFailures,
+    };
+  }
+
+  /**
+   * Enables or disables a partner by updating status in database.
+   */
+  async updatePartnerStatus(
+    partnerSlug: string,
+    body: { enabled?: boolean; status?: PartnerStatus; active?: boolean; disabled?: boolean },
+  ) {
+    let targetStatus: PartnerStatus;
+
+    if (body?.status) {
+      const allowed = [
+        PartnerStatus.ACTIVE,
+        PartnerStatus.DISABLED,
+        PartnerStatus.DEGRADED,
+        PartnerStatus.CIRCUIT_OPEN,
+      ];
+      if (!allowed.includes(body.status as PartnerStatus)) {
+        throw new BadRequestException(
+          `Invalid status '${body.status}'. Allowed values: ACTIVE, DISABLED`,
+        );
+      }
+      targetStatus = body.status as PartnerStatus;
+    } else if (typeof body?.enabled === 'boolean') {
+      targetStatus = body.enabled ? PartnerStatus.ACTIVE : PartnerStatus.DISABLED;
+    } else if (typeof body?.active === 'boolean') {
+      targetStatus = body.active ? PartnerStatus.ACTIVE : PartnerStatus.DISABLED;
+    } else if (typeof body?.disabled === 'boolean') {
+      targetStatus = body.disabled ? PartnerStatus.DISABLED : PartnerStatus.ACTIVE;
+    } else {
+      throw new BadRequestException(
+        'Request body must specify "enabled" (boolean) or "status" ("ACTIVE" | "DISABLED")',
+      );
+    }
+
+    const partner = await prisma.partner.findUnique({
+      where: { slug: partnerSlug },
+    });
+
+    if (!partner) {
+      throw new NotFoundException(`Partner with slug '${partnerSlug}' not found`);
+    }
+
+    const updated = await prisma.partner.update({
+      where: { id: partner.id },
+      data: { status: targetStatus },
+    });
+
+    // If re-enabling a partner, also reset circuit breaker
+    if (targetStatus === PartnerStatus.ACTIVE) {
+      await this.circuitBreaker.forceReset(partnerSlug);
+    }
+
+    this.logger.log(
+      `Partner '${partnerSlug}' status updated from ${partner.status} to ${targetStatus}`,
+    );
+
+    return {
+      success: true,
+      partner: {
+        id: updated.id,
+        slug: updated.slug,
+        name: updated.name,
+        status: updated.status,
+      },
+    };
   }
 }
