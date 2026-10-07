@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 
@@ -12,7 +12,7 @@ RUN pnpm --filter @cih/shared build
 RUN pnpm --filter @cih/database generate
 RUN pnpm --filter @cih/api build
 
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 RUN apk add --no-cache tini
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
