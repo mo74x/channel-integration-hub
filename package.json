@@ -12,7 +12,9 @@
     "db:studio": "pnpm --filter @cih/database studio",
     "build": "pnpm -r run build",
     "dev:api": "pnpm --filter @cih/api dev",
-    "dev:partners": "pnpm --filter @cih/mock-partners dev"
+    "dev:partners": "pnpm --filter @cih/mock-partners dev",
+    "test": "pnpm --filter @cih/api test",
+    "test:e2e": "pnpm --filter @cih/api test:e2e"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -9,6 +9,32 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cih_user
+          POSTGRES_PASSWORD: cih_secure_password
+          POSTGRES_DB: channel_hub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        command: redis-server --requirepass redis_secure_password
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli -a redis_secure_password ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +58,11 @@ jobs:
       - name: Run Prisma Generate
         run: pnpm --filter @cih/database generate
 
+      - name: Push Prisma Schema to Service Container DB
+        run: pnpm --filter @cih/database exec prisma db push
+        env:
+          DATABASE_URL: postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public
+
       - name: Typecheck Applications
         run: |
           pnpm --filter @cih/api exec tsc --noEmit
@@ -39,6 +70,17 @@ jobs:
 
       - name: Run Jest Unit Tests
         run: pnpm --filter @cih/api test
+
+      - name: Run Jest E2E Tests Against Service Containers
+        run: pnpm --filter @cih/api test:e2e
+        env:
+          CI: true
+          DATABASE_URL: postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: redis_secure_password
+          ADMIN_API_KEY: cih_admin_secret_key_dev
+          PARTNER_C_HMAC_SECRET: c8f126f5e92be2b1a8f940821d3e86f8
 
       - name: Build Docker Image
         run: docker build -t cih-api:test -f apps/api/Dockerfile .
