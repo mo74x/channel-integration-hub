@@ -1,15 +1,22 @@
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { InventoryService } from './inventory.service.js';
 import { DistributedLockService } from '../../common/redis/distributed-lock.service.js';
+import { SyncService } from '../sync/sync.service.js';
 import { prisma } from '@cih/database';
 
 jest.mock('@cih/database', () => ({
   prisma: {
+    property: {
+      findUnique: jest.fn(),
+    },
     inventoryUnit: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     inventoryCalendar: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      upsert: jest.fn(),
     },
     $transaction: jest.fn().mockImplementation(async (callback) => {
       return await callback(prisma);
@@ -20,6 +27,7 @@ jest.mock('@cih/database', () => ({
 describe('InventoryService', () => {
   let service: InventoryService;
   let mockLockService: jest.Mocked<DistributedLockService>;
+  let mockSyncService: jest.Mocked<Partial<SyncService>>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -32,7 +40,11 @@ describe('InventoryService', () => {
       releaseLock: jest.fn().mockResolvedValue(true),
     } as unknown as jest.Mocked<DistributedLockService>;
 
-    service = new InventoryService(mockLockService);
+    mockSyncService = {
+      broadcastInventoryUpdate: jest.fn().mockResolvedValue(undefined),
+    };
+
+    service = new InventoryService(mockLockService, mockSyncService as SyncService);
   });
 
   describe('restoreInventoryUnits', () => {
@@ -115,6 +127,115 @@ describe('InventoryService', () => {
       expect(result.totalPriceCents).toBe(50000); // 2 nights * 25000
       expect(mockLockService.acquireLock).toHaveBeenCalledTimes(2);
       expect(mockLockService.releaseLock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getAvailability', () => {
+    it('should throw NotFoundException if property does not exist', async () => {
+      (prisma.property.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.getAvailability('unknown-prop', '2026-11-10', '2026-11-12'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if dates are invalid or from > to', async () => {
+      await expect(
+        service.getAvailability('prop-1', '2026-11-15', '2026-11-10'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return units with calendar availability', async () => {
+      (prisma.property.findUnique as jest.Mock).mockResolvedValue({
+        id: 'prop-1',
+        name: 'Grand Hotel',
+        currency: 'USD',
+        timezone: 'UTC',
+      });
+
+      (prisma.inventoryUnit.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'unit-1',
+          externalCode: 'DELUXE_KING',
+          name: 'Deluxe King',
+          totalUnits: 10,
+          calendar: [
+            {
+              date: new Date('2026-11-10T00:00:00.000Z'),
+              availableUnits: 4,
+              priceInCents: 20000,
+            },
+          ],
+        },
+      ]);
+
+      const res = await service.getAvailability('prop-1', '2026-11-10', '2026-11-12');
+
+      expect(res.propertyId).toBe('prop-1');
+      expect(res.units).toHaveLength(1);
+      expect(res.units[0].code).toBe('DELUXE_KING');
+      expect(res.units[0].calendar[0].availableUnits).toBe(4);
+      expect(res.units[0].calendar[0].isAvailable).toBe(true);
+    });
+  });
+
+  describe('bulkUpdateCalendar', () => {
+    it('should throw NotFoundException if inventory unit does not exist', async () => {
+      (prisma.inventoryUnit.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.bulkUpdateCalendar('prop-1', 'UNKNOWN_UNIT', [
+          { date: '2026-11-10', availableUnits: 5, priceInCents: 15000 },
+        ]),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should upsert calendar records and trigger fan-out across partners', async () => {
+      (prisma.inventoryUnit.findUnique as jest.Mock).mockResolvedValue({
+        id: 'unit-1',
+        propertyId: 'prop-1',
+        externalCode: 'DELUXE_KING',
+        totalUnits: 10,
+      });
+
+      (prisma.inventoryCalendar.upsert as jest.Mock).mockImplementation(async ({ create }) => ({
+        id: `cal-${create.date.toISOString().slice(0, 10)}`,
+        ...create,
+      }));
+
+      const entries = [
+        { date: '2026-11-10', availableUnits: 4, priceInCents: 18000 },
+        { date: '2026-11-11', availableUnits: 4, priceInCents: 18000 },
+      ];
+
+      const res = await service.bulkUpdateCalendar('prop-1', 'DELUXE_KING', entries);
+
+      expect(res.success).toBe(true);
+      expect(res.updatedCount).toBe(2);
+      expect(res.fanoutTriggered).toBe(true);
+
+      // Verify locks acquired
+      expect(mockLockService.acquireLock).toHaveBeenCalledTimes(2);
+
+      // Verify database upsert called
+      expect(prisma.inventoryCalendar.upsert).toHaveBeenCalledTimes(2);
+
+      // Verify fan-out broadcast called for each updated date
+      expect(mockSyncService.broadcastInventoryUpdate).toHaveBeenCalledTimes(2);
+      expect(mockSyncService.broadcastInventoryUpdate).toHaveBeenNthCalledWith(1, {
+        propertyId: 'prop-1',
+        inventoryUnitCode: 'DELUXE_KING',
+        date: '2026-11-10',
+        availableUnits: 4,
+        priceInCents: 18000,
+      });
+      expect(mockSyncService.broadcastInventoryUpdate).toHaveBeenNthCalledWith(2, {
+        propertyId: 'prop-1',
+        inventoryUnitCode: 'DELUXE_KING',
+        date: '2026-11-11',
+        availableUnits: 4,
+        priceInCents: 18000,
+      });
     });
   });
 });

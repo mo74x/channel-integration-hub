@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, OnModuleInit, forwardRef } from '@nestjs/common';
 import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SYNC_QUEUES, SYNC_JOBS } from './sync.constants.js';
@@ -12,7 +12,7 @@ import { AvailabilityFanoutListener } from './availability-fanout.listener.js';
 @Module({
   imports: [
     AdaptorsModule,
-    ReservationsModule,
+    forwardRef(() => ReservationsModule),
     BullModule.registerQueue(
       { name: SYNC_QUEUES.OUTBOUND_INVENTORY },
       { name: SYNC_QUEUES.POLLING_RESERVATIONS },
