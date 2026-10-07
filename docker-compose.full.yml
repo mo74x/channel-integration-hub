@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cih_full_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cih_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cih_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-channel_hub}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - full_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cih_user} -d ${POSTGRES_DB:-channel_hub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: cih_full_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - full_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  mock-partners:
+    build:
+      context: .
+      dockerfile: apps/mock-partners/Dockerfile
+    container_name: cih_full_mock_partners
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MOCK_PARTNERS_PORT: 4000
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000', (res) => process.exit(0)).on('error', () => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: cih_full_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cih_user}:${POSTGRES_PASSWORD:-cih_secure_password}@postgres:5432/${POSTGRES_DB:-channel_hub}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secure_password}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-cih_admin_secret_key_dev}
+      PARTNER_A_API_KEY: ${PARTNER_A_API_KEY:-cih_live_partner_a_key_98765}
+      PARTNER_A_BASE_URL: http://mock-partners:4000/partner-a
+      PARTNER_B_CLIENT_ID: ${PARTNER_B_CLIENT_ID:-client_b_channel_corp}
+      PARTNER_B_CLIENT_SECRET: ${PARTNER_B_CLIENT_SECRET:-secret_b_oauth_token_val}
+      PARTNER_B_BASE_URL: http://mock-partners:4000/partner-b
+      PARTNER_C_HMAC_SECRET: ${PARTNER_C_HMAC_SECRET:-c8f126f5e92be2b1a8f940821d3e86f8}
+      PARTNER_C_BASE_URL: http://mock-partners:4000/partner-c
+      PARTNER_D_API_KEY: ${PARTNER_D_API_KEY:-cih_live_partner_d_key_112233}
+      PARTNER_D_BASE_URL: http://mock-partners:4000/partner-d
+      CIRCUIT_BREAKER_FAILURE_THRESHOLD: 5
+      CIRCUIT_BREAKER_COOLDOWN_MS: 30000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mock-partners:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: cih_full_web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      NEXT_PUBLIC_ADMIN_API_KEY: ${ADMIN_API_KEY:-cih_admin_secret_key_dev}
+    ports:
+      - "3001:3001"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3001', (res) => process.exit(0)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  full_postgres_data:
+  full_redis_data:

@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+**/node_modules
+.pnpm-store
+
+# Build outputs & caches
+dist
+**/dist
+build
+**/build
+out
+**/out
+.next
+**/.next
+.turbo
+*.tsbuildinfo
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Git & CI/CD
+.git
+.github
+
+# IDE & OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# AI agent caches & skills
+.agents
+.claude
+.windsurf
+.skills
+skills-lock.json
+
+# Test & coverage artifacts
+coverage
+**/coverage
+.nyc_output
+tests/k6
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
