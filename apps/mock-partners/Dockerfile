@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 
@@ -8,7 +8,7 @@ COPY apps/mock-partners ./apps/mock-partners
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @cih/mock-partners build
 
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
