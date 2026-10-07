@@ -7,6 +7,7 @@ import { ReservationsModule } from '../reservations/reservations.module.js';
 import { SyncService } from './sync.service.js';
 import { OutboundSyncProcessor } from './processors/outbound-sync.processor.js';
 import { PollingProcessor } from './processors/polling.processor.js';
+import { AvailabilityFanoutListener } from './availability-fanout.listener.js';
 
 @Module({
   imports: [
@@ -18,8 +19,13 @@ import { PollingProcessor } from './processors/polling.processor.js';
       { name: SYNC_QUEUES.RECONCILIATION },
     ),
   ],
-  providers: [SyncService, OutboundSyncProcessor, PollingProcessor],
-  exports: [SyncService],
+  providers: [
+    SyncService,
+    OutboundSyncProcessor,
+    PollingProcessor,
+    AvailabilityFanoutListener,
+  ],
+  exports: [SyncService, AvailabilityFanoutListener],
 })
 export class SyncModule implements OnModuleInit {
   constructor(

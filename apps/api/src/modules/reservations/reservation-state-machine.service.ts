@@ -4,7 +4,9 @@ import { ReservationStatus } from '@cih/shared';
 import { prisma } from '@cih/database';
 import { InventoryService } from '../inventory/inventory.service.js';
 
+export const RESERVATION_INVENTORY_CHANGED_EVENT = 'reservation.inventory-changed';
 export const domainEventEmitter = new EventEmitter();
+domainEventEmitter.setMaxListeners(100);
 
 export interface TransitionRequest {
   partnerId: string;
@@ -27,6 +29,7 @@ export interface ReservationInventoryChangedEvent {
   partnerId: string;
   propertyId: string;
   inventoryUnitId: string;
+  inventoryUnitCode?: string;
   action: 'CONFIRMED' | 'CANCELLED';
   unitsBooked: number;
   checkInDate: string;
@@ -130,11 +133,12 @@ export class ReservationStateMachineService {
         }
 
         // Emit domain event for confirmed reservation
-        this.events.emit('reservation.inventory-changed', {
+        this.events.emit(RESERVATION_INVENTORY_CHANGED_EVENT, {
           reservationId: created.id,
           partnerId: created.partnerId,
           propertyId: created.propertyId,
           inventoryUnitId: created.inventoryUnitId,
+          inventoryUnitCode: req.inventoryUnitCode,
           action: 'CONFIRMED',
           unitsBooked: created.unitsBooked,
           checkInDate: req.checkInDate,
@@ -196,11 +200,12 @@ export class ReservationStateMachineService {
       });
 
       // Emit domain event for cancelled reservation
-      this.events.emit('reservation.inventory-changed', {
+      this.events.emit(RESERVATION_INVENTORY_CHANGED_EVENT, {
         reservationId: updated.id,
         partnerId: updated.partnerId,
         propertyId: updated.propertyId,
         inventoryUnitId: updated.inventoryUnitId,
+        inventoryUnitCode: req.inventoryUnitCode,
         action: 'CANCELLED',
         unitsBooked: updated.unitsBooked,
         checkInDate: existing.checkInDate.toISOString().slice(0, 10),
@@ -247,11 +252,12 @@ export class ReservationStateMachineService {
         throw updateError;
       }
 
-      this.events.emit('reservation.inventory-changed', {
+      this.events.emit(RESERVATION_INVENTORY_CHANGED_EVENT, {
         reservationId: updated.id,
         partnerId: updated.partnerId,
         propertyId: updated.propertyId,
         inventoryUnitId: updated.inventoryUnitId,
+        inventoryUnitCode: req.inventoryUnitCode,
         action: 'CONFIRMED',
         unitsBooked: updated.unitsBooked,
         checkInDate: checkInStr,

@@ -5,6 +5,10 @@ import { prisma, SyncJobType } from '@cih/database';
 import { CanonicalInventoryPushPayload } from '@cih/shared';
 import { SYNC_QUEUES, SYNC_JOBS } from './sync.constants.js';
 
+export interface BroadcastInventoryOptions {
+  skipPartnerId?: string | null;
+}
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
@@ -15,14 +19,37 @@ export class SyncService {
   ) {}
 
   /**
-   * Dispatches inventory push jobs across all active partner adaptors.
+   * Dispatches inventory push jobs across all active partner adaptors,
+   * skipping the partner that sent the booking (no echo loop).
    */
-  async broadcastInventoryUpdate(update: CanonicalInventoryPushPayload): Promise<void> {
+  async broadcastInventoryUpdate(
+    update: CanonicalInventoryPushPayload,
+    skipPartnerIdOrOptions?: string | null | BroadcastInventoryOptions,
+  ): Promise<void> {
+    const skipPartnerId =
+      typeof skipPartnerIdOrOptions === 'object' && skipPartnerIdOrOptions !== null
+        ? skipPartnerIdOrOptions.skipPartnerId
+        : skipPartnerIdOrOptions;
+
     const activePartners = await prisma.partner.findMany({
-      where: { status: 'ACTIVE' },
+      where: {
+        status: 'ACTIVE',
+        ...(skipPartnerId
+          ? {
+              AND: [
+                { id: { not: skipPartnerId } },
+                { slug: { not: skipPartnerId } },
+              ],
+            }
+          : {}),
+      },
     });
 
-    for (const partner of activePartners) {
+    const targetPartners = activePartners.filter(
+      (partner) => !skipPartnerId || (partner.id !== skipPartnerId && partner.slug !== skipPartnerId),
+    );
+
+    for (const partner of targetPartners) {
       // Audit trail: Record pending sync job in database
       const syncRecord = await prisma.syncJob.create({
         data: {
