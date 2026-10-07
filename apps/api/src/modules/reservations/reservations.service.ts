@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '@cih/database';
 import { ReservationStatus } from '@cih/shared';
 
@@ -26,7 +22,6 @@ export interface FindReservationsQuery {
 
 @Injectable()
 export class ReservationsService {
-
   /**
    * Retrieves paginated reservations matching partner, status, and date range filters.
    */
@@ -36,10 +31,7 @@ export class ReservationsService {
     // 1. Filter by Partner (by internal UUID or slug)
     const partnerFilter = query.partner || query.partnerId || query.partnerSlug;
     if (partnerFilter) {
-      where.OR = [
-        { partnerId: partnerFilter },
-        { partner: { slug: partnerFilter } },
-      ];
+      where.OR = [{ partnerId: partnerFilter }, { partner: { slug: partnerFilter } }];
     }
 
     // 2. Filter by Status

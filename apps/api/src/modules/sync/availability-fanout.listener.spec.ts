@@ -57,10 +57,7 @@ describe('AvailabilityFanoutListener', () => {
       broadcastInventoryUpdate: jest.fn().mockResolvedValue(undefined),
     };
 
-    listener = new AvailabilityFanoutListener(
-      mockSyncService as SyncService,
-      eventEmitter,
-    );
+    listener = new AvailabilityFanoutListener(mockSyncService as SyncService, eventEmitter);
   });
 
   describe('Lifecycle subscription', () => {

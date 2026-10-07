@@ -37,9 +37,7 @@ export class InventoryController {
     @Param('code') code: string,
     @Body() body: any,
   ) {
-    const entries = Array.isArray(body)
-      ? body
-      : (body?.entries || body?.calendar || body?.updates);
+    const entries = Array.isArray(body) ? body : body?.entries || body?.calendar || body?.updates;
 
     if (!Array.isArray(entries) || entries.length === 0) {
       throw new BadRequestException(

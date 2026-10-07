@@ -15,7 +15,9 @@ describe('AdminController', () => {
       getSyncJobs: jest.fn().mockResolvedValue([]),
       replaySyncJob: jest.fn().mockResolvedValue({ success: true } as any),
       getReconciliationLogs: jest.fn().mockResolvedValue([]),
-      triggerReconciliation: jest.fn().mockResolvedValue({ partnerSlug: 'partner_a', driftDetected: 0 }),
+      triggerReconciliation: jest
+        .fn()
+        .mockResolvedValue({ partnerSlug: 'partner_a', driftDetected: 0 }),
       resolveReconciliationLog: jest.fn().mockResolvedValue({
         success: true,
         action: 'ACCEPT_PARTNER',
@@ -65,13 +67,13 @@ describe('AdminController', () => {
 
   describe('POST /admin/reconciliation-logs/:id/resolve', () => {
     it('should throw BadRequestException if body or action is missing', async () => {
-      await expect(
-        controller.resolveReconciliationLog('log-1', null as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.resolveReconciliationLog('log-1', null as any)).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        controller.resolveReconciliationLog('log-1', {} as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.resolveReconciliationLog('log-1', {} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should delegate resolution action to adminService.resolveReconciliationLog', async () => {
@@ -98,10 +100,7 @@ describe('AdminController', () => {
       await controller.resolveReconciliationLog('log-3', {
         action: 'DISMISS',
       });
-      expect(mockAdminService.resolveReconciliationLog).toHaveBeenCalledWith(
-        'log-3',
-        'DISMISS',
-      );
+      expect(mockAdminService.resolveReconciliationLog).toHaveBeenCalledWith('log-3', 'DISMISS');
     });
   });
 });

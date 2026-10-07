@@ -127,8 +127,7 @@ export class OutboundSyncProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   async onJobFailed(job: Job<OutboundInventoryJobData>, error: Error) {
     const isUnrecoverable =
-      error instanceof UnrecoverableError ||
-      error?.name === 'UnrecoverableError';
+      error instanceof UnrecoverableError || error?.name === 'UnrecoverableError';
     const exhaustedRetries = job.attemptsMade >= (job.opts?.attempts || 5);
 
     if (isUnrecoverable || exhaustedRetries) {
@@ -149,4 +148,4 @@ export class OutboundSyncProcessor extends WorkerHost {
       }
     }
   }
-}
+}

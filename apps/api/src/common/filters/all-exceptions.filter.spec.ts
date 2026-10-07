@@ -82,18 +82,17 @@ describe('AllExceptionsFilter', () => {
     const responseBody: ErrorResponseEnvelope = mockResponse.json.mock.calls[0][0];
     expect(responseBody.statusCode).toBe(409);
     expect(responseBody.error).toBe('Conflict');
-    expect(responseBody.message).toContain('Unique constraint violation on partnerId, externalBookingId');
+    expect(responseBody.message).toContain(
+      'Unique constraint violation on partnerId, externalBookingId',
+    );
   });
 
   it('should map Prisma P2025 (Record not found) error to 404 Not Found', () => {
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      'Record to update not found',
-      {
-        code: 'P2025',
-        clientVersion: '7.10.0',
-        meta: { cause: 'No Reservation found' },
-      },
-    );
+    const prismaError = new Prisma.PrismaClientKnownRequestError('Record to update not found', {
+      code: 'P2025',
+      clientVersion: '7.10.0',
+      meta: { cause: 'No Reservation found' },
+    });
 
     filter.catch(prismaError, mockHost);
 
@@ -105,13 +104,10 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('should map Prisma P2003 (Foreign key constraint violation) error to 400 Bad Request', () => {
-    const prismaError = new Prisma.PrismaClientKnownRequestError(
-      'Foreign key constraint failed',
-      {
-        code: 'P2003',
-        clientVersion: '7.10.0',
-      },
-    );
+    const prismaError = new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', {
+      code: 'P2003',
+      clientVersion: '7.10.0',
+    });
 
     filter.catch(prismaError, mockHost);
 

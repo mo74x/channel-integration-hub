@@ -144,9 +144,7 @@ describe('SchemaMapperService', () => {
     it('throws BadRequestException if propertyPartnerMapping record is not found', async () => {
       (prisma.propertyPartnerMapping.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.applyMapping('unknown-map', {})).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.applyMapping('unknown-map', {})).rejects.toThrow(BadRequestException);
     });
   });
 });

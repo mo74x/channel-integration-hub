@@ -19,7 +19,7 @@ export const CanonicalReservationSchema = z.object({
 
 export const CanonicalInventoryPushSchema = z.object({
   propertyId: z.string().uuid(),
-  inventoryUnitCode: z.string().min(1), 
+  inventoryUnitCode: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
   availableUnits: z.number().int().nonnegative(),
   priceInCents: z.number().int().positive(),

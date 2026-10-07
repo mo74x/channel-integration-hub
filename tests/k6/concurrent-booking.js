@@ -6,15 +6,15 @@ export const options = {
   scenarios: {
     last_unit_race_condition: {
       executor: 'shared-iterations',
-      vus: 30,             // 30 concurrent client threads
-      iterations: 30,      // Exactly 30 booking attempts
+      vus: 30, // 30 concurrent client threads
+      iterations: 30, // Exactly 30 booking attempts
       maxDuration: '15s',
     },
   },
 };
 
 const BASE_URL = __ENV.API_URL || 'http://localhost:3000';
-const HMAC_SECRET = __ENV.PARTNER_C_HMAC_SECRET ;
+const HMAC_SECRET = __ENV.PARTNER_C_HMAC_SECRET;
 
 export default function () {
   const vuId = __VU;

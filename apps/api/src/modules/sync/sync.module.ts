@@ -19,12 +19,7 @@ import { AvailabilityFanoutListener } from './availability-fanout.listener.js';
       { name: SYNC_QUEUES.RECONCILIATION },
     ),
   ],
-  providers: [
-    SyncService,
-    OutboundSyncProcessor,
-    PollingProcessor,
-    AvailabilityFanoutListener,
-  ],
+  providers: [SyncService, OutboundSyncProcessor, PollingProcessor, AvailabilityFanoutListener],
   exports: [SyncService, AvailabilityFanoutListener],
 })
 export class SyncModule implements OnModuleInit {

@@ -178,7 +178,8 @@ describe('fetchWithTimeout', () => {
   });
 
   it('redacts sensitive query parameter values from URL in logs and errors', () => {
-    const raw = 'https://api.partner.com/v1/sync?apiKey=super_secret_123&token=my_bearer_token&property=prop1';
+    const raw =
+      'https://api.partner.com/v1/sync?apiKey=super_secret_123&token=my_bearer_token&property=prop1';
     const redacted = redactSensitiveUrl(raw);
     expect(redacted).not.toContain('super_secret_123');
     expect(redacted).not.toContain('my_bearer_token');
@@ -188,12 +189,8 @@ describe('fetchWithTimeout', () => {
   });
 
   it('rejects disallowed URL protocols to prevent SSRF vulnerabilities', async () => {
-    await expect(
-      fetchWithTimeout('file:///etc/passwd'),
-    ).rejects.toThrow(PartnerHttpError);
+    await expect(fetchWithTimeout('file:///etc/passwd')).rejects.toThrow(PartnerHttpError);
 
-    await expect(
-      fetchWithTimeout('javascript:alert(1)'),
-    ).rejects.toThrow(PartnerHttpError);
+    await expect(fetchWithTimeout('javascript:alert(1)')).rejects.toThrow(PartnerHttpError);
   });
 });

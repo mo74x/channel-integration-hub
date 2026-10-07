@@ -1,8 +1,5 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import {
-  ReservationsService,
-  FindReservationsQuery,
-} from './reservations.service.js';
+import { ReservationsService, FindReservationsQuery } from './reservations.service.js';
 
 @Controller('reservations')
 export class ReservationsController {

@@ -2,7 +2,11 @@ import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
-import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import {
+  PartnerAdaptor,
+  PartnerCapabilities,
+  WebhookValidationResult,
+} from '../partner-adaptor.interface.js';
 import { safeCompare } from '../../../common/crypto/safe-compare.js';
 
 @Injectable()
@@ -72,7 +76,9 @@ export class PartnerCAdaptor implements PartnerAdaptor {
     }
   }
 
-  async transformInboundReservation(raw: any): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
+  async transformInboundReservation(
+    raw: any,
+  ): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
     const res = raw.reservation;
     let status: ReservationStatus = ReservationStatus.PENDING;
 

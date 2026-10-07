@@ -5,11 +5,6 @@ import { PartnerCController } from './partner-c/partner-c.controller.js';
 import { PartnerDController } from './partner-d/partner-d.controller.js';
 
 @Module({
-  controllers: [
-    PartnerAController,
-    PartnerBController,
-    PartnerCController,
-    PartnerDController,
-  ],
+  controllers: [PartnerAController, PartnerBController, PartnerCController, PartnerDController],
 })
 export class AppModule {}

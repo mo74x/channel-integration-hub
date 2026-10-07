@@ -65,7 +65,9 @@ describe('Admin Endpoints Authentication E2E', () => {
     it('POST /admin/partners/:slug/circuit/reset returns 401 without API key', async () => {
       if (!servicesReady) return;
 
-      const res = await request(app.getHttpServer()).post('/admin/partners/partner_a/circuit/reset');
+      const res = await request(app.getHttpServer()).post(
+        '/admin/partners/partner_a/circuit/reset',
+      );
       expect(res.status).toBe(401);
     });
 

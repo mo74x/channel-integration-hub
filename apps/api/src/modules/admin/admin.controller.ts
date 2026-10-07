@@ -31,16 +31,14 @@ export class AdminController {
   @Patch('partners/:slug')
   updatePartnerStatus(
     @Param('slug') slug: string,
-    @Body() body: { enabled?: boolean; status?: PartnerStatus; active?: boolean; disabled?: boolean },
+    @Body()
+    body: { enabled?: boolean; status?: PartnerStatus; active?: boolean; disabled?: boolean },
   ) {
     return this.adminService.updatePartnerStatus(slug, body);
   }
 
   @Get('jobs')
-  getJobs(
-    @Query('status') status?: SyncJobStatus,
-    @Query('take') take?: string,
-  ) {
+  getJobs(@Query('status') status?: SyncJobStatus, @Query('take') take?: string) {
     const safeTake = Math.min(Math.max(1, parseInt(take || '50', 10) || 50), 100);
     return this.adminService.getSyncJobs(status, safeTake);
   }

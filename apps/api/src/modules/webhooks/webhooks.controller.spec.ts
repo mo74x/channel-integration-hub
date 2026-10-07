@@ -49,11 +49,7 @@ describe('WebhooksController', () => {
       processTransition: jest.fn().mockResolvedValue({ id: 'res-1', status: 'CONFIRMED' }),
     } as unknown as jest.Mocked<ReservationStateMachineService>;
 
-    controller = new WebhooksController(
-      adaptorsMap,
-      mockIdempotencyService,
-      mockStateMachine,
-    );
+    controller = new WebhooksController(adaptorsMap, mockIdempotencyService, mockStateMachine);
   });
 
   it('throws BadRequestException when no adaptor registered for partner slug', async () => {
@@ -72,9 +68,9 @@ describe('WebhooksController', () => {
 
     const mockReq = { body: {} } as any;
 
-    await expect(
-      controller.handleIncomingWebhook('partner_c', {}, mockReq),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(controller.handleIncomingWebhook('partner_c', {}, mockReq)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('replays cached response directly when idempotency service reports duplicate', async () => {
@@ -106,14 +102,17 @@ describe('WebhooksController', () => {
       parsedBody: { property_id: 'EXT-PROP-999' },
     });
 
-    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({ id: 'part-1', slug: 'partner_c' });
+    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+      id: 'part-1',
+      slug: 'partner_c',
+    });
     (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
     const mockReq = { rawBody: Buffer.from(rawBody) } as any;
 
-    await expect(
-      controller.handleIncomingWebhook('partner_c', {}, mockReq),
-    ).rejects.toThrow(UnprocessableEntityException);
+    await expect(controller.handleIncomingWebhook('partner_c', {}, mockReq)).rejects.toThrow(
+      UnprocessableEntityException,
+    );
 
     expect(prisma.propertyPartnerMapping.findFirst).toHaveBeenCalledWith({
       where: { partnerId: 'part-1', externalPropertyId: 'EXT-PROP-999' },
@@ -131,8 +130,13 @@ describe('WebhooksController', () => {
       parsedBody: { property_id: 'EXT-PROP-1' },
     });
 
-    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({ id: 'part-1', slug: 'partner_c' });
-    (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce({ propertyId: 'c9f0b188-39dc-4613-81ef-42d4a23bca01' });
+    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+      id: 'part-1',
+      slug: 'partner_c',
+    });
+    (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce({
+      propertyId: 'c9f0b188-39dc-4613-81ef-42d4a23bca01',
+    });
 
     mockAdaptor.transformInboundReservation.mockResolvedValueOnce({
       externalBookingId: 'BOOK-1',
@@ -166,8 +170,13 @@ describe('WebhooksController', () => {
       parsedBody: { property_id: 'EXT-PROP-1' },
     });
 
-    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({ id: 'part-1', slug: 'partner_c' });
-    (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce({ propertyId: 'c9f0b188-39dc-4613-81ef-42d4a23bca01' });
+    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+      id: 'part-1',
+      slug: 'partner_c',
+    });
+    (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce({
+      propertyId: 'c9f0b188-39dc-4613-81ef-42d4a23bca01',
+    });
 
     mockAdaptor.transformInboundReservation.mockResolvedValueOnce({
       externalBookingId: '',
@@ -179,9 +188,9 @@ describe('WebhooksController', () => {
 
     const mockReq = { rawBody: Buffer.from(rawBody) } as any;
 
-    await expect(
-      controller.handleIncomingWebhook('partner_c', {}, mockReq),
-    ).rejects.toThrow(UnprocessableEntityException);
+    await expect(controller.handleIncomingWebhook('partner_c', {}, mockReq)).rejects.toThrow(
+      UnprocessableEntityException,
+    );
 
     expect(mockStateMachine.processTransition).not.toHaveBeenCalled();
     expect(mockIdempotencyService.rollback).toHaveBeenCalledWith('evt-1');
@@ -196,8 +205,13 @@ describe('WebhooksController', () => {
       parsedBody: { property_id: 'EXT-PROP-1' },
     });
 
-    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({ id: 'part-1', slug: 'partner_c' });
-    (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce({ propertyId: 'c9f0b188-39dc-4613-81ef-42d4a23bca01' });
+    (prisma.partner.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+      id: 'part-1',
+      slug: 'partner_c',
+    });
+    (prisma.propertyPartnerMapping.findFirst as jest.Mock).mockResolvedValueOnce({
+      propertyId: 'c9f0b188-39dc-4613-81ef-42d4a23bca01',
+    });
 
     mockAdaptor.transformInboundReservation.mockResolvedValueOnce({
       externalBookingId: 'BOOK-ERR',
@@ -218,9 +232,9 @@ describe('WebhooksController', () => {
 
     const mockReq = { rawBody: Buffer.from(rawBody) } as any;
 
-    await expect(
-      controller.handleIncomingWebhook('partner_c', {}, mockReq),
-    ).rejects.toThrow('Database error during transition');
+    await expect(controller.handleIncomingWebhook('partner_c', {}, mockReq)).rejects.toThrow(
+      'Database error during transition',
+    );
 
     expect(mockIdempotencyService.rollback).toHaveBeenCalledWith('evt-fail');
   });

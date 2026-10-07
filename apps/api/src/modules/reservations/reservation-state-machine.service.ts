@@ -48,7 +48,7 @@ export class ReservationStateMachineService {
     ],
     [ReservationStatus.CONFIRMED]: [ReservationStatus.CANCELLED],
     [ReservationStatus.CANCELLED]: [], // Terminal state
-    [ReservationStatus.REJECTED]: [],  // Terminal state
+    [ReservationStatus.REJECTED]: [], // Terminal state
   };
 
   constructor(

@@ -29,12 +29,6 @@ import { PartnerAdaptor } from './partner-adaptor.interface.js';
       inject: [PartnerAAdaptor, PartnerBAdaptor, PartnerCAdaptor, PartnerDAdaptor],
     },
   ],
-  exports: [
-    'ADAPTOR_REGISTRY',
-    PartnerAAdaptor,
-    PartnerBAdaptor,
-    PartnerCAdaptor,
-    PartnerDAdaptor,
-  ],
+  exports: ['ADAPTOR_REGISTRY', PartnerAAdaptor, PartnerBAdaptor, PartnerCAdaptor, PartnerDAdaptor],
 })
 export class AdaptorsModule {}

@@ -1,7 +1,5 @@
 import { SyncService } from './sync.service.js';
-import { prisma, 
-  
- } from '@cih/database';
+import { prisma } from '@cih/database';
 import { Queue } from 'bullmq';
 import { SYNC_JOBS } from './sync.constants.js';
 
@@ -98,9 +96,7 @@ describe('SyncService - broadcastInventoryUpdate', () => {
     expect(prisma.syncJob.create).toHaveBeenCalledTimes(2);
     expect(mockQueue.add).toHaveBeenCalledTimes(2);
 
-    const queuedSlugs = (mockQueue.add as jest.Mock).mock.calls.map(
-      (call) => call[1].partnerSlug,
-    );
+    const queuedSlugs = (mockQueue.add as jest.Mock).mock.calls.map((call) => call[1].partnerSlug);
     expect(queuedSlugs).toEqual(['partner_b', 'partner_c']);
     expect(queuedSlugs).not.toContain('partner_a');
   });
@@ -110,9 +106,7 @@ describe('SyncService - broadcastInventoryUpdate', () => {
 
     await service.broadcastInventoryUpdate(dummyPayload, 'partner_b');
 
-    const queuedSlugs = (mockQueue.add as jest.Mock).mock.calls.map(
-      (call) => call[1].partnerSlug,
-    );
+    const queuedSlugs = (mockQueue.add as jest.Mock).mock.calls.map((call) => call[1].partnerSlug);
     expect(queuedSlugs).toEqual(['partner_a', 'partner_c']);
     expect(queuedSlugs).not.toContain('partner_b');
   });
@@ -122,9 +116,7 @@ describe('SyncService - broadcastInventoryUpdate', () => {
 
     await service.broadcastInventoryUpdate(dummyPayload, { skipPartnerId: 'partner-uuid-c' });
 
-    const queuedSlugs = (mockQueue.add as jest.Mock).mock.calls.map(
-      (call) => call[1].partnerSlug,
-    );
+    const queuedSlugs = (mockQueue.add as jest.Mock).mock.calls.map((call) => call[1].partnerSlug);
     expect(queuedSlugs).toEqual(['partner_a', 'partner_b']);
     expect(queuedSlugs).not.toContain('partner_c');
   });

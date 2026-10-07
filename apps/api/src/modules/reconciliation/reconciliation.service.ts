@@ -111,7 +111,9 @@ export class ReconciliationService {
       }
     }
 
-    this.logger.log(`Reconciliation finished for ${partnerSlug}. Total drift items identified: ${driftCount}`);
+    this.logger.log(
+      `Reconciliation finished for ${partnerSlug}. Total drift items identified: ${driftCount}`,
+    );
     return driftCount;
   }
 
@@ -122,11 +124,7 @@ export class ReconciliationService {
    * - ACCEPT_PARTNER: Applies partner's remote state through the reservation state machine.
    */
   async resolveDriftLog(logId: string, action: DriftResolutionAction) {
-    const validActions: DriftResolutionAction[] = [
-      'ACCEPT_PARTNER',
-      'KEEP_CANONICAL',
-      'DISMISS',
-    ];
+    const validActions: DriftResolutionAction[] = ['ACCEPT_PARTNER', 'KEEP_CANONICAL', 'DISMISS'];
 
     if (!validActions.includes(action)) {
       throw new BadRequestException(
@@ -197,15 +195,11 @@ export class ReconciliationService {
     }
 
     const partnerData = (
-      typeof log.partnerData === 'object' && log.partnerData !== null
-        ? log.partnerData
-        : {}
+      typeof log.partnerData === 'object' && log.partnerData !== null ? log.partnerData : {}
     ) as Record<string, any>;
 
     const driftDetail = (
-      typeof log.driftDetail === 'object' && log.driftDetail !== null
-        ? log.driftDetail
-        : {}
+      typeof log.driftDetail === 'object' && log.driftDetail !== null ? log.driftDetail : {}
     ) as Record<string, any>;
 
     // 1. Locate reservation (by ID or external booking reference)
@@ -231,9 +225,7 @@ export class ReconciliationService {
     if (reservation) {
       // Status mismatch on existing reservation: transition to target partner status
       const targetStatus =
-        partnerData.status ||
-        driftDetail.partnerStatus ||
-        driftDetail.details?.status;
+        partnerData.status || driftDetail.partnerStatus || driftDetail.details?.status;
 
       if (!targetStatus) {
         throw new BadRequestException(
@@ -247,9 +239,7 @@ export class ReconciliationService {
         targetStatus: targetStatus as ReservationStatus,
         propertyId: reservation.propertyId,
         inventoryUnitCode:
-          reservation.inventoryUnit?.externalCode ||
-          partnerData.inventoryUnitCode ||
-          '',
+          reservation.inventoryUnit?.externalCode || partnerData.inventoryUnitCode || '',
         checkInDate: reservation.checkInDate.toISOString().slice(0, 10),
         checkOutDate: reservation.checkOutDate.toISOString().slice(0, 10),
         unitsBooked: reservation.unitsBooked,

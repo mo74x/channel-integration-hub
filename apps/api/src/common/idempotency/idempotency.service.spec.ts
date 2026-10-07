@@ -66,9 +66,9 @@ describe('IdempotencyService', () => {
         lockedUntil: futureDate,
       });
 
-      await expect(
-        service.acquireOrReplay('key-inflight', 'WEBHOOK:PARTNER_A'),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.acquireOrReplay('key-inflight', 'WEBHOOK:PARTNER_A')).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('reclaims lock when previous lock has expired', async () => {

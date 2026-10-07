@@ -16,10 +16,7 @@ export class PartnerAController {
 
   @Post('inventory')
   @HttpCode(HttpStatus.OK)
-  syncInventory(
-    @Headers('x-api-key') apiKey: string,
-    @Body() body: Record<string, unknown>,
-  ) {
+  syncInventory(@Headers('x-api-key') apiKey: string, @Body() body: Record<string, unknown>) {
     if (!apiKey || apiKey !== this.validApiKey) {
       this.logger.warn(`Partner A: Unauthorized inventory push attempt. Received: ${apiKey}`);
       throw new UnauthorizedException('Invalid or missing x-api-key header');

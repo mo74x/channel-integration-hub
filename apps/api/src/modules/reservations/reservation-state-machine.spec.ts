@@ -221,7 +221,9 @@ describe('ReservationStateMachineService', () => {
 
     it('compensates and restores inventory when initial reservation creation fails', async () => {
       (prisma.reservation.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.reservation.create as jest.Mock).mockRejectedValue(new Error('DB Constraint Violation'));
+      (prisma.reservation.create as jest.Mock).mockRejectedValue(
+        new Error('DB Constraint Violation'),
+      );
 
       await expect(
         service.processTransition({

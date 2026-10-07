@@ -4,7 +4,8 @@ import { createHmac } from 'node:crypto';
 @Controller('partner-c')
 export class PartnerCController {
   private readonly logger = new Logger(PartnerCController.name);
-  private readonly hmacSecret = process.env.PARTNER_C_HMAC_SECRET || 'c8f126f5e92be2b1a8f940821d3e86f8';
+  private readonly hmacSecret =
+    process.env.PARTNER_C_HMAC_SECRET || 'c8f126f5e92be2b1a8f940821d3e86f8';
 
   /**
    * Utility endpoint that formats a sample Partner C webhook payload and signs it.

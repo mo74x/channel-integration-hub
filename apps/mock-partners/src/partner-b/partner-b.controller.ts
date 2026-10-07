@@ -64,10 +64,7 @@ export class PartnerBController {
   }
 
   @Get('reservations')
-  pullReservations(
-    @Headers('authorization') authHeader: string,
-    @Query('since') since?: string,
-  ) {
+  pullReservations(@Headers('authorization') authHeader: string, @Query('since') since?: string) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing Bearer token');
     }

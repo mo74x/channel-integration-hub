@@ -36,17 +36,15 @@ export class SyncService {
         status: 'ACTIVE',
         ...(skipPartnerId
           ? {
-              AND: [
-                { id: { not: skipPartnerId } },
-                { slug: { not: skipPartnerId } },
-              ],
+              AND: [{ id: { not: skipPartnerId } }, { slug: { not: skipPartnerId } }],
             }
           : {}),
       },
     });
 
     const targetPartners = activePartners.filter(
-      (partner) => !skipPartnerId || (partner.id !== skipPartnerId && partner.slug !== skipPartnerId),
+      (partner) =>
+        !skipPartnerId || (partner.id !== skipPartnerId && partner.slug !== skipPartnerId),
     );
 
     for (const partner of targetPartners) {
@@ -82,7 +80,9 @@ export class SyncService {
         },
       );
 
-      this.logger.log(`Enqueued inventory sync for partner ${partner.slug} (Job: ${syncRecord.id})`);
+      this.logger.log(
+        `Enqueued inventory sync for partner ${partner.slug} (Job: ${syncRecord.id})`,
+      );
     }
   }
 }

@@ -51,9 +51,7 @@ describe('RequestIdMiddleware', () => {
 
     expect(nextFn).toHaveBeenCalled();
     const generatedId = mockRequest.headers['x-request-id'];
-    expect(generatedId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
+    expect(generatedId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(mockRequest.id).toBe(generatedId);
     expect(mockResponse.setHeader).toHaveBeenCalledWith('x-request-id', generatedId);
     expect(capturedIdInContext).toBe(generatedId);

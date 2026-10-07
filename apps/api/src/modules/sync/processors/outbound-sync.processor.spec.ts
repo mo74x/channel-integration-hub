@@ -188,7 +188,9 @@ describe('OutboundSyncProcessor', () => {
         where: { id: 'sync-123' },
         data: {
           status: SyncJobStatus.DEAD_LETTER,
-          lastError: expect.stringContaining('Exhausted retries: 503 Service Unavailable repeatedly'),
+          lastError: expect.stringContaining(
+            'Exhausted retries: 503 Service Unavailable repeatedly',
+          ),
         },
       });
     });

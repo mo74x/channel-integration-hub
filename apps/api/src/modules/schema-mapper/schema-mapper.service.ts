@@ -30,9 +30,14 @@ export class SchemaMapperService {
   /**
    * Prompts the LLM with a partner sample payload to propose field mappings against canonical fields.
    */
-  async proposeMapping(partnerSlug: string, samplePayload: Record<string, unknown>): Promise<MappingProposal> {
+  async proposeMapping(
+    partnerSlug: string,
+    samplePayload: Record<string, unknown>,
+  ): Promise<MappingProposal> {
     if (!this.apiKey) {
-      this.logger.warn('OPENAI_API_KEY is not set. Generating deterministic heuristic fallback mapping.');
+      this.logger.warn(
+        'OPENAI_API_KEY is not set. Generating deterministic heuristic fallback mapping.',
+      );
       return this.heuristicFallback(samplePayload);
     }
 
@@ -109,7 +114,9 @@ ${JSON.stringify(samplePayload, null, 2)}`;
       const parsed = JSON.parse(content);
       return MappingProposalSchema.parse(parsed);
     } catch (error: any) {
-      this.logger.error(`AI mapping generation failed: ${error.message}. Returning heuristic mapping.`);
+      this.logger.error(
+        `AI mapping generation failed: ${error.message}. Returning heuristic mapping.`,
+      );
       return this.heuristicFallback(samplePayload);
     }
   }
@@ -123,7 +130,9 @@ ${JSON.stringify(samplePayload, null, 2)}`;
     });
 
     if (!record) {
-      throw new BadRequestException(`PropertyPartnerMapping '${propertyPartnerMappingId}' not found`);
+      throw new BadRequestException(
+        `PropertyPartnerMapping '${propertyPartnerMappingId}' not found`,
+      );
     }
 
     return prisma.propertyPartnerMapping.update({

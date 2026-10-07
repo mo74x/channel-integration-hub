@@ -16,16 +16,15 @@ export class PartnerDController {
 
   @Post('inventory')
   @HttpCode(HttpStatus.OK)
-  syncInventory(
-    @Headers('x-api-key') apiKey: string,
-    @Body() body: Record<string, unknown>,
-  ) {
+  syncInventory(@Headers('x-api-key') apiKey: string, @Body() body: Record<string, unknown>) {
     if (!apiKey || apiKey !== this.validApiKey) {
       this.logger.warn(`Partner D: Unauthorized inventory push attempt. Received: ${apiKey}`);
       throw new UnauthorizedException('Invalid or missing x-api-key header');
     }
 
-    this.logger.log(`Partner D: Inventory push accepted for unit ${body['unit_code'] || body['room_type_id']}`);
+    this.logger.log(
+      `Partner D: Inventory push accepted for unit ${body['unit_code'] || body['room_type_id']}`,
+    );
     return {
       success: true,
       acknowledgementId: `ack_d_${Date.now()}`,

@@ -190,9 +190,7 @@ export function generatePartnerCSignature(
   secret: string = process.env.PARTNER_C_HMAC_SECRET || 'c8f126f5e92be2b1a8f940821d3e86f8',
 ): string {
   const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  return createHmac('sha256', secret)
-    .update(`${timestamp}.${payloadStr}`)
-    .digest('hex');
+  return createHmac('sha256', secret).update(`${timestamp}.${payloadStr}`).digest('hex');
 }
 
 /**

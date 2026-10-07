@@ -38,12 +38,16 @@ export class AvailabilityFanoutListener implements OnModuleInit, OnModuleDestroy
 
   onModuleInit() {
     this.events.on(RESERVATION_INVENTORY_CHANGED_EVENT, this.boundHandler);
-    this.logger.log(`AvailabilityFanoutListener subscribed to ${RESERVATION_INVENTORY_CHANGED_EVENT}`);
+    this.logger.log(
+      `AvailabilityFanoutListener subscribed to ${RESERVATION_INVENTORY_CHANGED_EVENT}`,
+    );
   }
 
   onModuleDestroy() {
     this.events.off(RESERVATION_INVENTORY_CHANGED_EVENT, this.boundHandler);
-    this.logger.log(`AvailabilityFanoutListener unsubscribed from ${RESERVATION_INVENTORY_CHANGED_EVENT}`);
+    this.logger.log(
+      `AvailabilityFanoutListener unsubscribed from ${RESERVATION_INVENTORY_CHANGED_EVENT}`,
+    );
   }
 
   /**

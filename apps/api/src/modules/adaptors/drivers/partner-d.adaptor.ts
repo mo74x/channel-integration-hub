@@ -61,7 +61,8 @@ export class PartnerDAdaptor implements PartnerAdaptor {
     }
 
     try {
-      const parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : JSON.parse(rawBody.toString('utf-8'));
+      const parsed =
+        typeof rawBody === 'string' ? JSON.parse(rawBody) : JSON.parse(rawBody.toString('utf-8'));
       const idempotencyKey =
         (headers['x-idempotency-key'] as string) ||
         (headers['idempotency-key'] as string) ||
@@ -82,7 +83,9 @@ export class PartnerDAdaptor implements PartnerAdaptor {
     }
   }
 
-  async transformInboundReservation(raw: any): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
+  async transformInboundReservation(
+    raw: any,
+  ): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
     let status: ReservationStatus = ReservationStatus.PENDING;
     const actionOrStatus = (raw.action || raw.status || raw.state || '').toUpperCase();
     if (
@@ -111,10 +114,8 @@ export class PartnerDAdaptor implements PartnerAdaptor {
     const unitsBooked = Number(
       raw.units_count || raw.units || raw.rooms_count || raw.units_booked || 1,
     );
-    const guestName =
-      raw.customer?.name || raw.guest?.name || raw.guest_name || 'Unknown Guest';
-    const guestEmail =
-      raw.customer?.email || raw.guest?.email || raw.guest_email;
+    const guestName = raw.customer?.name || raw.guest?.name || raw.guest_name || 'Unknown Guest';
+    const guestEmail = raw.customer?.email || raw.guest?.email || raw.guest_email;
 
     let totalPriceCents = 0;
     if (raw.total_price_cents !== undefined) {

@@ -5,7 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';  
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@cih/database';
@@ -30,9 +30,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const requestId =
-      (request.headers['x-request-id'] as string) ||
-      (request as any).id ||
-      randomUUID();
+      (request.headers['x-request-id'] as string) || (request as any).id || randomUUID();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = 'Internal Server Error';
@@ -98,7 +96,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
     // 3. Handle PartnerHttpError (outbound partner communication failures)
     else if (exception instanceof PartnerHttpError) {
-      statusCode = exception.status >= 400 && exception.status < 600 ? exception.status : HttpStatus.BAD_GATEWAY;
+      statusCode =
+        exception.status >= 400 && exception.status < 600
+          ? exception.status
+          : HttpStatus.BAD_GATEWAY;
       error = 'Upstream Partner Error';
       message =
         process.env.NODE_ENV === 'production'

@@ -1,50 +1,119 @@
-# Dependencies
+# ==============================================================================
+# Monorepo Root .gitignore
+# Channel Integration Hub
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Dependencies & Package Managers
+# ------------------------------------------------------------------------------
 node_modules/
+**/node_modules/
 .pnpm-store/
+.npm/
+.yarn/
 
-# Build outputs
+# ------------------------------------------------------------------------------
+# Build Outputs & Compilation Caches
+# ------------------------------------------------------------------------------
 dist/
+**/dist/
 build/
+**/build/
 out/
+**/out/
 .next/
+**/.next/
+!.next/types
 .turbo/
+**/.turbo/
 *.tsbuildinfo
+**/*.tsbuildinfo
+.rollup.cache/
 
-# Environment variables
+# ------------------------------------------------------------------------------
+# Environment Variables & Local Secrets
+# ------------------------------------------------------------------------------
 .env
+.env.*
 .env.local
-.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
 
-# Logs
+# Certificates & Keys
+*.pem
+*.key
+*.cert
+*.crt
+
+# ------------------------------------------------------------------------------
+# Logs & Process Dumps
+# ------------------------------------------------------------------------------
 logs/
+**/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
-# OS / Editor files
+# ------------------------------------------------------------------------------
+# Testing, Coverage & Artifacts
+# ------------------------------------------------------------------------------
+coverage/
+**/coverage/
+.nyc_output/
+*.lcov
+junit.xml
+test-report.xml
+.test-results/
+
+# ------------------------------------------------------------------------------
+# Operating System & Editor Files
+# ------------------------------------------------------------------------------
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+[Tt]humbs.db
+
+# IDEs & Text Editors
 .vscode/
 .idea/
-*.swp
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 *.swo
+*.swp
+*~
 
-# AI Agents & CLI Skills (e.g. Prisma agent skills)
+# ------------------------------------------------------------------------------
+# Local Databases, Caches & Docker Volume Mounts
+# ------------------------------------------------------------------------------
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+postgres_data/
+redis_data/
+full_postgres_data/
+full_redis_data/
+prod_postgres_data/
+prod_redis_data/
+
+# ------------------------------------------------------------------------------
+# AI Agents & Local Workspace Skills
+# ------------------------------------------------------------------------------
 .agents/
 .claude/
 .windsurf/
 .skills/
 skills-lock.json
-
-# Local Databases & Backups
-*.db
-*.db-journal
-*.sqlite
-*.sqlite-journal
-
-# Testing & Coverage
-coverage/
-.nyc_output/
+.gemini/

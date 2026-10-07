@@ -103,7 +103,9 @@ export class InventoryService {
     });
 
     if (!unit) {
-      throw new BadRequestException(`Unit ${inventoryUnitCode} does not exist for property ${propertyId}`);
+      throw new BadRequestException(
+        `Unit ${inventoryUnitCode} does not exist for property ${propertyId}`,
+      );
     }
 
     return await this.withInventoryLocks(unit.id, dates, async () => {
@@ -194,14 +196,11 @@ export class InventoryService {
   /**
    * Retrieves availability and rates across units for a property within a date window.
    */
-  async getAvailability(
-    propertyId: string,
-    from: string,
-    to: string,
-    unitCode?: string,
-  ) {
+  async getAvailability(propertyId: string, from: string, to: string, unitCode?: string) {
     if (!from || !to) {
-      throw new BadRequestException('Query parameters "from" and "to" (format: YYYY-MM-DD) are required');
+      throw new BadRequestException(
+        'Query parameters "from" and "to" (format: YYYY-MM-DD) are required',
+      );
     }
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -270,11 +269,7 @@ export class InventoryService {
   /**
    * Bulk updates availability and rates for an inventory unit and triggers outbound fan-out.
    */
-  async bulkUpdateCalendar(
-    propertyId: string,
-    unitCode: string,
-    entries: CalendarUpdateEntry[],
-  ) {
+  async bulkUpdateCalendar(propertyId: string, unitCode: string, entries: CalendarUpdateEntry[]) {
     if (!Array.isArray(entries) || entries.length === 0) {
       throw new BadRequestException('Calendar entries must be a non-empty array');
     }
@@ -286,7 +281,9 @@ export class InventoryService {
       }
       if (
         entry.availableUnits !== undefined &&
-        (typeof entry.availableUnits !== 'number' || entry.availableUnits < 0 || !Number.isInteger(entry.availableUnits))
+        (typeof entry.availableUnits !== 'number' ||
+          entry.availableUnits < 0 ||
+          !Number.isInteger(entry.availableUnits))
       ) {
         throw new BadRequestException(
           `availableUnits must be a non-negative integer for date ${entry.date}`,
@@ -294,7 +291,9 @@ export class InventoryService {
       }
       if (
         entry.priceInCents !== undefined &&
-        (typeof entry.priceInCents !== 'number' || entry.priceInCents < 0 || !Number.isInteger(entry.priceInCents))
+        (typeof entry.priceInCents !== 'number' ||
+          entry.priceInCents < 0 ||
+          !Number.isInteger(entry.priceInCents))
       ) {
         throw new BadRequestException(
           `priceInCents must be a non-negative integer for date ${entry.date}`,
@@ -312,7 +311,9 @@ export class InventoryService {
     });
 
     if (!unit) {
-      throw new NotFoundException(`Inventory unit "${unitCode}" not found for property "${propertyId}"`);
+      throw new NotFoundException(
+        `Inventory unit "${unitCode}" not found for property "${propertyId}"`,
+      );
     }
 
     const dates = entries.map((e) => new Date(`${e.date}T00:00:00.000Z`));
@@ -330,7 +331,9 @@ export class InventoryService {
               },
             },
             update: {
-              ...(entry.availableUnits !== undefined ? { availableUnits: entry.availableUnits } : {}),
+              ...(entry.availableUnits !== undefined
+                ? { availableUnits: entry.availableUnits }
+                : {}),
               ...(entry.priceInCents !== undefined ? { priceInCents: entry.priceInCents } : {}),
               version: { increment: 1 },
             },

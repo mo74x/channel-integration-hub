@@ -6,8 +6,83 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  validate:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Shared Types
+        run: pnpm --filter @cih/shared build
+
+      - name: Run Prisma Generate
+        run: pnpm --filter @cih/database generate
+
+      - name: Verify Code Formatting
+        run: pnpm format:check
+
+      - name: Typecheck Workspace
+        run: pnpm typecheck
+
+  unit-tests:
+    name: Unit Tests & Coverage
+    needs: [lint-and-typecheck]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Shared Types
+        run: pnpm --filter @cih/shared build
+
+      - name: Run Prisma Generate
+        run: pnpm --filter @cih/database generate
+
+      - name: Run Unit Tests with Coverage
+        run: pnpm test:cov
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage-report
+          path: apps/api/coverage
+          retention-days: 14
+
+  e2e-tests:
+    name: E2E Tests
+    needs: [unit-tests]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -63,16 +138,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public
 
-      - name: Typecheck Applications
-        run: |
-          pnpm --filter @cih/api exec tsc --noEmit
-          pnpm --filter @cih/mock-partners exec tsc --noEmit
-
-      - name: Run Jest Unit Tests
-        run: pnpm --filter @cih/api test
-
       - name: Run Jest E2E Tests Against Service Containers
-        run: pnpm --filter @cih/api test:e2e
+        run: pnpm test:e2e
         env:
           CI: true
           DATABASE_URL: postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public
@@ -82,5 +149,54 @@ jobs:
           ADMIN_API_KEY: cih_admin_secret_key_dev
           PARTNER_C_HMAC_SECRET: c8f126f5e92be2b1a8f940821d3e86f8
 
-      - name: Build Docker Image
-        run: docker build -t cih-api:test -f apps/api/Dockerfile .
+  docker-build:
+    name: Build & Push Docker Images (${{ matrix.name }})
+    needs: [e2e-tests]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: apps/api/Dockerfile
+            image: cih-api
+          - name: mock-partners
+            dockerfile: apps/mock-partners/Dockerfile
+            image: cih-mock-partners
+          - name: web
+            dockerfile: apps/web/Dockerfile
+            image: cih-web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

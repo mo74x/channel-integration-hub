@@ -103,12 +103,7 @@ describe('InventoryService', () => {
     it('acquires locks in lexicographical order and releases them in reverse order', async () => {
       (prisma.inventoryCalendar.update as jest.Mock).mockResolvedValue({ id: 'cal-1' });
 
-      await service.restoreInventoryUnits(
-        'unit-uuid-1',
-        '2026-11-10',
-        '2026-11-13',
-        1,
-      );
+      await service.restoreInventoryUnits('unit-uuid-1', '2026-11-10', '2026-11-13', 1);
 
       // Verify lexicographical order
       expect(mockLockService.acquireLock).toHaveBeenCalledTimes(3);
@@ -196,9 +191,9 @@ describe('InventoryService', () => {
     });
 
     it('should throw BadRequestException if dates are invalid or from > to', async () => {
-      await expect(
-        service.getAvailability('prop-1', '2026-11-15', '2026-11-10'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.getAvailability('prop-1', '2026-11-15', '2026-11-10')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should return units with calendar availability', async () => {

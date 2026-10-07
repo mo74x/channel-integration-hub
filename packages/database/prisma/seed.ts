@@ -143,7 +143,9 @@ async function main() {
   });
 
   console.log('Seed completed successfully:');
-  console.log(`- 4 Partners created: ${partnerA.slug}, ${partnerB.slug}, ${partnerC.slug}, ${partnerD.slug}`);
+  console.log(
+    `- 4 Partners created: ${partnerA.slug}, ${partnerB.slug}, ${partnerC.slug}, ${partnerD.slug}`,
+  );
   console.log(`- Property: "${property.name}" (${property.id})`);
   console.log(`- 2 Unit Types initialized with 30-day calendar availability windows.`);
 }

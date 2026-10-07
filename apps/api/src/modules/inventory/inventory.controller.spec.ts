@@ -30,13 +30,13 @@ describe('InventoryController', () => {
 
   describe('GET :propertyId/availability', () => {
     it('should throw BadRequestException if "from" or "to" query param is missing', async () => {
-      await expect(
-        controller.getAvailability('prop-1', '', '2026-11-12'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.getAvailability('prop-1', '', '2026-11-12')).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        controller.getAvailability('prop-1', '2026-11-10', ''),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.getAvailability('prop-1', '2026-11-10', '')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should call inventoryService.getAvailability and return the result', async () => {
@@ -59,13 +59,13 @@ describe('InventoryController', () => {
 
   describe('PUT :propertyId/units/:code/calendar', () => {
     it('should throw BadRequestException if body is not an array and lacks entries', async () => {
-      await expect(
-        controller.bulkUpdateCalendar('prop-1', 'DELUXE_KING', null),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.bulkUpdateCalendar('prop-1', 'DELUXE_KING', null)).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        controller.bulkUpdateCalendar('prop-1', 'DELUXE_KING', []),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.bulkUpdateCalendar('prop-1', 'DELUXE_KING', [])).rejects.toThrow(
+        BadRequestException,
+      );
 
       await expect(
         controller.bulkUpdateCalendar('prop-1', 'DELUXE_KING', { entries: [] }),
@@ -90,9 +90,7 @@ describe('InventoryController', () => {
     });
 
     it('should accept object wrapper { entries: [...] } and call bulkUpdateCalendar', async () => {
-      const entries = [
-        { date: '2026-11-10', availableUnits: 3, priceInCents: 12000 },
-      ];
+      const entries = [{ date: '2026-11-10', availableUnits: 3, priceInCents: 12000 }];
 
       const res = await controller.bulkUpdateCalendar('prop-1', 'DELUXE_KING', { entries });
 

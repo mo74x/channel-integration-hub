@@ -1,0 +1,6 @@
+# NestJS / API
+dist/
+node_modules/
+coverage/
+*.tsbuildinfo
+.env*.local

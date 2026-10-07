@@ -1,41 +1,44 @@
 import { z } from 'zod';
 
-export const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  API_PORT: z.coerce.number().int().positive().default(3000),
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    API_PORT: z.coerce.number().int().positive().default(3000),
 
-  // Database Connection
-  DATABASE_URL: z
-    .string()
-    .min(1, 'DATABASE_URL is required')
-    .default('postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public'),
+    // Database Connection
+    DATABASE_URL: z
+      .string()
+      .min(1, 'DATABASE_URL is required')
+      .default(
+        'postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public',
+      ),
 
-  // Redis Connection
-  REDIS_HOST: z.string().min(1).default('localhost'),
-  REDIS_PORT: z.coerce.number().int().positive().default(6379),
-  REDIS_PASSWORD: z.string().default('redis_secure_password'),
+    // Redis Connection
+    REDIS_HOST: z.string().min(1).default('localhost'),
+    REDIS_PORT: z.coerce.number().int().positive().default(6379),
+    REDIS_PASSWORD: z.string().default('redis_secure_password'),
 
-  // Admin Security
-  ADMIN_API_KEY: z.string().min(1).default('cih_admin_secret_key_dev'),
+    // Admin Security
+    ADMIN_API_KEY: z.string().min(1).default('cih_admin_secret_key_dev'),
 
-  // Partner Integrations & Gateways
-  PARTNER_A_API_KEY: z.string().min(1).default('cih_live_partner_a_key_98765'),
-  PARTNER_A_BASE_URL: z.string().url().default('http://localhost:4000/partner-a'),
-  PARTNER_B_CLIENT_ID: z.string().min(1).default('client_b_channel_corp'),
-  PARTNER_B_CLIENT_SECRET: z.string().min(1).default('secret_b_oauth_token_val'),
-  PARTNER_B_BASE_URL: z.string().url().default('http://localhost:4000/partner-b'),
-  PARTNER_C_HMAC_SECRET: z.string().min(1).default('c8f126f5e92be2b1a8f940821d3e86f8'),
-  PARTNER_C_BASE_URL: z.string().url().default('http://localhost:4000/partner-c'),
-  PARTNER_D_API_KEY: z.string().min(1).default('cih_live_partner_d_key_112233'),
-  PARTNER_D_BASE_URL: z.string().url().default('http://localhost:4000/partner-d'),
+    // Partner Integrations & Gateways
+    PARTNER_A_API_KEY: z.string().min(1).default('cih_live_partner_a_key_98765'),
+    PARTNER_A_BASE_URL: z.string().url().default('http://localhost:4000/partner-a'),
+    PARTNER_B_CLIENT_ID: z.string().min(1).default('client_b_channel_corp'),
+    PARTNER_B_CLIENT_SECRET: z.string().min(1).default('secret_b_oauth_token_val'),
+    PARTNER_B_BASE_URL: z.string().url().default('http://localhost:4000/partner-b'),
+    PARTNER_C_HMAC_SECRET: z.string().min(1).default('c8f126f5e92be2b1a8f940821d3e86f8'),
+    PARTNER_C_BASE_URL: z.string().url().default('http://localhost:4000/partner-c'),
+    PARTNER_D_API_KEY: z.string().min(1).default('cih_live_partner_d_key_112233'),
+    PARTNER_D_BASE_URL: z.string().url().default('http://localhost:4000/partner-d'),
 
-  // Circuit Breaker
-  CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
-  CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(30000),
+    // Circuit Breaker
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
+    CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(30000),
 
-  // External APIs
-  OPENAI_API_KEY: z.string().optional(),
-})
+    // External APIs
+    OPENAI_API_KEY: z.string().optional(),
+  })
   .refine(
     (data) => {
       if (data.NODE_ENV === 'production') {

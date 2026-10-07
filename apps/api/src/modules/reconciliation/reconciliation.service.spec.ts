@@ -172,17 +172,17 @@ describe('ReconciliationService', () => {
 
   describe('resolveDriftLog', () => {
     it('should throw BadRequestException if action is invalid', async () => {
-      await expect(
-        service.resolveDriftLog('log-1', 'INVALID_ACTION' as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.resolveDriftLog('log-1', 'INVALID_ACTION' as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw NotFoundException if reconciliation log is not found', async () => {
       (prisma.reconciliationLog.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(
-        service.resolveDriftLog('unknown-log', 'DISMISS'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.resolveDriftLog('unknown-log', 'DISMISS')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should update log as DISMISSED without calling state machine', async () => {

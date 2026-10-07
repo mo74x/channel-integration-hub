@@ -78,9 +78,9 @@ describe('ReservationsService', () => {
     });
 
     it('should throw BadRequestException on invalid status', async () => {
-      await expect(
-        service.findReservations({ status: 'INVALID_STATUS' as any }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.findReservations({ status: 'INVALID_STATUS' as any })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should filter by stay check-in date range', async () => {
@@ -100,9 +100,9 @@ describe('ReservationsService', () => {
     });
 
     it('should throw BadRequestException if date format is invalid or from > to', async () => {
-      await expect(
-        service.findReservations({ from: 'invalid-date' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.findReservations({ from: 'invalid-date' })).rejects.toThrow(
+        BadRequestException,
+      );
 
       await expect(
         service.findReservations({ from: '2026-11-20', to: '2026-11-10' }),
@@ -111,7 +111,9 @@ describe('ReservationsService', () => {
 
     it('should calculate pagination correctly across multiple pages', async () => {
       (prisma.reservation.count as jest.Mock).mockResolvedValue(55);
-      (prisma.reservation.findMany as jest.Mock).mockResolvedValue(new Array(10).fill({ id: 'res' }));
+      (prisma.reservation.findMany as jest.Mock).mockResolvedValue(
+        new Array(10).fill({ id: 'res' }),
+      );
 
       const result = await service.findReservations({ page: 2, limit: 10 });
 
@@ -168,9 +170,7 @@ describe('ReservationsService', () => {
       (prisma.reservation.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.reservation.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.getReservationById('unknown-id')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getReservationById('unknown-id')).rejects.toThrow(NotFoundException);
     });
   });
 });

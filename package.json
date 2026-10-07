@@ -17,7 +17,12 @@
     "dev:api": "pnpm --filter @cih/api dev",
     "dev:partners": "pnpm --filter @cih/mock-partners dev",
     "test": "pnpm --filter @cih/api test",
-    "test:e2e": "pnpm --filter @cih/api test:e2e"
+    "test:cov": "pnpm --filter @cih/api test:cov",
+    "test:e2e": "pnpm --filter @cih/api test:e2e",
+    "typecheck": "pnpm --filter @cih/shared build && pnpm --filter @cih/database generate && pnpm --filter @cih/api exec tsc --noEmit && pnpm --filter @cih/mock-partners exec tsc --noEmit && pnpm --filter @cih/web exec tsc --noEmit",
+    "lint": "prettier --check .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write ."
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

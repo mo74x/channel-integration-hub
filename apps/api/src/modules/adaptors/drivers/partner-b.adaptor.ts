@@ -1,7 +1,11 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
-import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import {
+  PartnerAdaptor,
+  PartnerCapabilities,
+  WebhookValidationResult,
+} from '../partner-adaptor.interface.js';
 import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
@@ -75,10 +79,15 @@ export class PartnerBAdaptor implements PartnerAdaptor {
   }
 
   async verifyWebhook(): Promise<WebhookValidationResult> {
-    return { isValid: false, error: 'Partner B does not emit webhooks (Polling architecture only)' };
+    return {
+      isValid: false,
+      error: 'Partner B does not emit webhooks (Polling architecture only)',
+    };
   }
 
-  async transformInboundReservation(raw: any): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
+  async transformInboundReservation(
+    raw: any,
+  ): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
     let status: ReservationStatus = ReservationStatus.PENDING;
     if (raw.current_status === 'BOOKED') status = ReservationStatus.CONFIRMED;
     if (raw.current_status === 'CANCELLED') status = ReservationStatus.CANCELLED;

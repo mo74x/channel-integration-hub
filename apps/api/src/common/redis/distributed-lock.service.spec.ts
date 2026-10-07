@@ -80,10 +80,15 @@ describe('DistributedLockService', () => {
       });
 
       let executed = false;
-      const result = await service.runWithLock('wrapped-task', async () => {
-        executed = true;
-        return 'operation-result';
-      }, 5000, 1);
+      const result = await service.runWithLock(
+        'wrapped-task',
+        async () => {
+          executed = true;
+          return 'operation-result';
+        },
+        5000,
+        1,
+      );
 
       expect(executed).toBe(true);
       expect(result).toBe('operation-result');
@@ -97,9 +102,14 @@ describe('DistributedLockService', () => {
       });
 
       await expect(
-        service.runWithLock('failing-task', async () => {
-          throw new Error('Task crashed');
-        }, 5000, 0),
+        service.runWithLock(
+          'failing-task',
+          async () => {
+            throw new Error('Task crashed');
+          },
+          5000,
+          0,
+        ),
       ).rejects.toThrow('Task crashed');
 
       expect(mockRedis.eval).toHaveBeenCalled();

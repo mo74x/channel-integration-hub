@@ -18,10 +18,6 @@ import { ReservationsController } from './reservations.controller.js';
       useValue: domainEventEmitter,
     },
   ],
-  exports: [
-    ReservationStateMachineService,
-    ReservationsService,
-    'DOMAIN_EVENT_EMITTER',
-  ],
+  exports: [ReservationStateMachineService, ReservationsService, 'DOMAIN_EVENT_EMITTER'],
 })
 export class ReservationsModule {}

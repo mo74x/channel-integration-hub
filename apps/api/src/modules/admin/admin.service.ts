@@ -166,7 +166,9 @@ export class AdminService {
 
     const circuitStatus = await this.circuitBreaker.getStatus(partnerSlug);
 
-    this.logger.log(`Circuit breaker reset for partner '${partnerSlug}' (Status: ${currentStatus})`);
+    this.logger.log(
+      `Circuit breaker reset for partner '${partnerSlug}' (Status: ${currentStatus})`,
+    );
     return {
       success: true,
       partnerSlug,

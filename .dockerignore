@@ -1,7 +1,13 @@
+# ==============================================================================
+# Monorepo Root .dockerignore
+# ==============================================================================
+
 # Dependencies
 node_modules
 **/node_modules
 .pnpm-store
+.npm
+.yarn
 
 # Build outputs & caches
 dist
@@ -14,23 +20,34 @@ out
 **/.next
 .turbo
 *.tsbuildinfo
+**/*.tsbuildinfo
+.rollup.cache
 
 # Environment variables & secrets
 .env
 .env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
+*.pem
+*.key
+*.cert
+*.crt
 
 # Git & CI/CD
 .git
 .github
 
-# IDE & OS files
+# IDEs & OS files
 .vscode
 .idea
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
+*~
 
 # AI agent caches & skills
 .agents
@@ -38,15 +55,30 @@ Thumbs.db
 .windsurf
 .skills
 skills-lock.json
+.gemini
 
 # Test & coverage artifacts
 coverage
 **/coverage
 .nyc_output
+*.lcov
 tests/k6
+
+# Local databases & Docker data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+postgres_data
+redis_data
+full_postgres_data
+full_redis_data
+prod_postgres_data
+prod_redis_data
 
 # Logs
 logs
+**/logs
 *.log
 npm-debug.log*
 yarn-debug.log*

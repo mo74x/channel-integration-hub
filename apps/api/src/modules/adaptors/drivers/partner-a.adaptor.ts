@@ -1,7 +1,15 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ReservationStatus, CanonicalInventoryPushPayload, CanonicalReservationPayload } from '@cih/shared';
-import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
+import {
+  ReservationStatus,
+  CanonicalInventoryPushPayload,
+  CanonicalReservationPayload,
+} from '@cih/shared';
+import {
+  PartnerAdaptor,
+  PartnerCapabilities,
+  WebhookValidationResult,
+} from '../partner-adaptor.interface.js';
 import { safeCompare } from '../../../common/crypto/safe-compare.js';
 import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
@@ -47,8 +55,12 @@ export class PartnerAAdaptor implements PartnerAdaptor {
     }
 
     try {
-      const parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : JSON.parse(rawBody.toString('utf-8'));
-      const idempotencyKey = (headers['x-idempotency-key'] as string) || parsed.transaction_id || parsed.booking_reference;
+      const parsed =
+        typeof rawBody === 'string' ? JSON.parse(rawBody) : JSON.parse(rawBody.toString('utf-8'));
+      const idempotencyKey =
+        (headers['x-idempotency-key'] as string) ||
+        parsed.transaction_id ||
+        parsed.booking_reference;
 
       return {
         isValid: true,
@@ -60,7 +72,9 @@ export class PartnerAAdaptor implements PartnerAdaptor {
     }
   }
 
-  async transformInboundReservation(raw: any): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
+  async transformInboundReservation(
+    raw: any,
+  ): Promise<Omit<CanonicalReservationPayload, 'reservationId'>> {
     let status: ReservationStatus = ReservationStatus.PENDING;
     if (raw.action === 'BOOK' || raw.status === 'CONFIRMED') status = ReservationStatus.CONFIRMED;
     if (raw.action === 'CANCEL' || raw.status === 'CANCELLED') status = ReservationStatus.CANCELLED;
@@ -81,7 +95,9 @@ export class PartnerAAdaptor implements PartnerAdaptor {
     };
   }
 
-  async pushInventory(update: CanonicalInventoryPushPayload): Promise<{ success: boolean; partnerSyncId?: string }> {
+  async pushInventory(
+    update: CanonicalInventoryPushPayload,
+  ): Promise<{ success: boolean; partnerSyncId?: string }> {
     const payload = {
       property_id: update.propertyId,
       room_type_id: update.inventoryUnitCode,

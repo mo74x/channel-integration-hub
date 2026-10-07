@@ -1,6 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service.js';
-import { CircuitBreakerService, CircuitState } from '../../common/circuit-breaker/circuit-breaker.service.js';
+import {
+  CircuitBreakerService,
+  CircuitState,
+} from '../../common/circuit-breaker/circuit-breaker.service.js';
 import { ReconciliationService } from '../reconciliation/reconciliation.service.js';
 import { prisma, PartnerStatus, SyncJobStatus, SyncJobType } from '@cih/database';
 import { Queue } from 'bullmq';
@@ -186,7 +189,9 @@ describe('AdminService', () => {
     it('delegates to reconciliationService.reconcilePartnerReservations', async () => {
       const res = await service.triggerReconciliation('partner_b');
       expect(res).toEqual({ partnerSlug: 'partner_b', driftDetected: 2 });
-      expect(mockReconciliationService.reconcilePartnerReservations).toHaveBeenCalledWith('partner_b');
+      expect(mockReconciliationService.reconcilePartnerReservations).toHaveBeenCalledWith(
+        'partner_b',
+      );
     });
 
     it('delegates to reconciliationService.resolveDriftLog', async () => {
@@ -200,9 +205,9 @@ describe('AdminService', () => {
     it('should throw NotFoundException if partner does not exist', async () => {
       (prisma.partner.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(
-        service.resetPartnerCircuit('unknown_partner'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.resetPartnerCircuit('unknown_partner')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should force reset circuit breaker and update status if partner was CIRCUIT_OPEN', async () => {
@@ -247,9 +252,9 @@ describe('AdminService', () => {
 
   describe('updatePartnerStatus', () => {
     it('should throw BadRequestException if neither enabled nor status is provided', async () => {
-      await expect(
-        service.updatePartnerStatus('partner_a', {} as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.updatePartnerStatus('partner_a', {} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException if status is invalid', async () => {

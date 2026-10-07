@@ -23,7 +23,7 @@ export interface CanonicalReservationPayload {
   externalBookingId: string;
   propertyId: string;
   inventoryUnitCode: string;
-  checkInDate: string;  // YYYY-MM-DD
+  checkInDate: string; // YYYY-MM-DD
   checkOutDate: string; // YYYY-MM-DD
   unitsBooked: number;
   guestName: string;

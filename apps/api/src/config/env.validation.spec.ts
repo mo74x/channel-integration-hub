@@ -13,7 +13,8 @@ describe('validateEnv', () => {
 
   it('should successfully validate and apply default values when provided minimal valid config', () => {
     const config = {
-      DATABASE_URL: 'postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public',
+      DATABASE_URL:
+        'postgresql://cih_user:cih_secure_password@localhost:5432/channel_hub?schema=public',
     };
 
     const validated = validateEnv(config);
@@ -52,9 +53,7 @@ describe('validateEnv', () => {
       PARTNER_A_BASE_URL: 'not-a-valid-url',
     };
 
-    expect(() => validateEnv(config)).toThrow(
-      /Invalid url/,
-    );
+    expect(() => validateEnv(config)).toThrow(/Invalid url/);
   });
 
   it('should reject default dev secrets when NODE_ENV is production', () => {

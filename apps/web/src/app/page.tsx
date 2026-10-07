@@ -97,8 +97,12 @@ export default function DashboardPage() {
       {/* Top Controls */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">System Health & Operations</h2>
-          <p className="text-sm text-slate-400">Real-time status across heterogeneous external partner channels</p>
+          <h2 className="text-2xl font-bold tracking-tight text-white">
+            System Health & Operations
+          </h2>
+          <p className="text-sm text-slate-400">
+            Real-time status across heterogeneous external partner channels
+          </p>
         </div>
         <button
           onClick={fetchData}
@@ -143,7 +147,8 @@ export default function DashboardPage() {
                   Failures: <span className="font-mono text-white">{p.consecutiveFailures}</span>
                 </div>
                 <div>
-                  DLQ Jobs: <span className="font-mono text-amber-400">{p.unresolvedFailedJobs}</span>
+                  DLQ Jobs:{' '}
+                  <span className="font-mono text-amber-400">{p.unresolvedFailedJobs}</span>
                 </div>
               </div>
             </div>
@@ -187,7 +192,9 @@ export default function DashboardPage() {
                     <td className="px-6 py-4 font-medium text-white">{job.partner.name}</td>
                     <td className="px-6 py-4 font-mono text-xs text-slate-400">{job.jobType}</td>
                     <td className="px-6 py-4 font-mono text-xs">{job.attempts} / 5</td>
-                    <td className="px-6 py-4 text-xs text-red-400 max-w-xs truncate">{job.lastError}</td>
+                    <td className="px-6 py-4 text-xs text-red-400 max-w-xs truncate">
+                      {job.lastError}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => handleReplay(job.id)}

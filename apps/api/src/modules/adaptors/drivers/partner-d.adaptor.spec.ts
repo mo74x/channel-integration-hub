@@ -164,10 +164,10 @@ describe('PartnerDAdaptor', () => {
 
   describe('pushInventory', () => {
     it('successfully pushes inventory updates to Partner D endpoint', async () => {
-      const mockResponse = new Response(
-        JSON.stringify({ acknowledgementId: 'ack_d_12345' }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      );
+      const mockResponse = new Response(JSON.stringify({ acknowledgementId: 'ack_d_12345' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
       global.fetch = jest.fn().mockResolvedValue(mockResponse);
 
       const update = {

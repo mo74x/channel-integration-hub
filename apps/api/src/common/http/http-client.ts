@@ -57,8 +57,7 @@ export class PartnerHttpError extends Error {
       this.url = opts.url;
     } else {
       const st = status ?? 500;
-      const computedRetryable =
-        isRetryable !== undefined ? isRetryable : isRetryableStatusCode(st);
+      const computedRetryable = isRetryable !== undefined ? isRetryable : isRetryableStatusCode(st);
       super(messageOrOptions, { cause: details?.cause });
       this.name = 'PartnerHttpError';
       this.status = st;
@@ -96,7 +95,16 @@ export interface FetchWithTimeoutOptions extends RequestInit {
 export function redactSensitiveUrl(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
-    const sensitiveKeys = ['key', 'api_key', 'apikey', 'secret', 'token', 'password', 'client_secret', 'auth'];
+    const sensitiveKeys = [
+      'key',
+      'api_key',
+      'apikey',
+      'secret',
+      'token',
+      'password',
+      'client_secret',
+      'auth',
+    ];
     for (const [key] of parsed.searchParams) {
       if (sensitiveKeys.some((s) => key.toLowerCase().includes(s))) {
         parsed.searchParams.set(key, '[REDACTED]');
@@ -126,11 +134,7 @@ export async function fetchWithTimeout(
   } = options;
 
   const urlStr =
-    typeof input === 'string'
-      ? input
-      : input instanceof URL
-        ? input.toString()
-        : input.url;
+    typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
   const safeUrl = redactSensitiveUrl(urlStr);
 
@@ -155,9 +159,7 @@ export async function fetchWithTimeout(
       combinedSignal = AbortSignal.any([callerSignal, timeoutController.signal]);
     } else {
       const combinedController = new AbortController();
-      callerSignal.addEventListener('abort', () =>
-        combinedController.abort(callerSignal.reason),
-      );
+      callerSignal.addEventListener('abort', () => combinedController.abort(callerSignal.reason));
       timeoutController.signal.addEventListener('abort', () =>
         combinedController.abort(timeoutController.signal.reason),
       );

@@ -10,11 +10,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cih_secure_password}
       POSTGRES_DB: ${POSTGRES_DB:-channel_hub}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cih_user} -d ${POSTGRES_DB:-channel_hub}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-cih_user} -d ${POSTGRES_DB:-channel_hub}']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,11 +25,11 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-redis_secure_password}', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
     environment:
       - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD:-redis_secure_password}
     ports:
-      - "8081:8081"
+      - '8081:8081'
     depends_on:
       redis:
         condition: service_healthy

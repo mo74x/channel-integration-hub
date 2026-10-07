@@ -108,7 +108,9 @@ export class WebhooksController {
       });
 
       // Validate normalized payload with Zod canonical schema
-      const parseResult = CanonicalReservationSchema.omit({ reservationId: true }).safeParse(normalized);
+      const parseResult = CanonicalReservationSchema.omit({ reservationId: true }).safeParse(
+        normalized,
+      );
       if (!parseResult.success) {
         throw new UnprocessableEntityException({
           message: 'Normalized payload failed canonical schema validation',

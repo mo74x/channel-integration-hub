@@ -3,8 +3,8 @@ import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module.js';
 
 export enum CircuitState {
-  CLOSED = 'CLOSED',       // Normal operation
-  OPEN = 'OPEN',           // Partner down; fail fast
+  CLOSED = 'CLOSED', // Normal operation
+  OPEN = 'OPEN', // Partner down; fail fast
   HALF_OPEN = 'HALF_OPEN', // Trial probe request
 }
 
@@ -95,7 +95,8 @@ export class CircuitBreakerService {
    * Records a successful partner API response and resets failure counters and circuit state.
    */
   async recordSuccess(partnerSlug: string): Promise<void> {
-    await this.redis.pipeline()
+    await this.redis
+      .pipeline()
       .set(this.getStateKey(partnerSlug), CircuitState.CLOSED)
       .del(this.getFailuresKey(partnerSlug))
       .del(this.getOpenedAtKey(partnerSlug))
@@ -115,7 +116,8 @@ export class CircuitBreakerService {
 
     // A failed probe in HALF_OPEN immediately re-opens the circuit
     if (state === CircuitState.HALF_OPEN) {
-      await this.redis.pipeline()
+      await this.redis
+        .pipeline()
         .set(this.getStateKey(partnerSlug), CircuitState.OPEN)
         .set(this.getOpenedAtKey(partnerSlug), Date.now().toString())
         .del(this.getProbeKey(partnerSlug))
@@ -131,7 +133,8 @@ export class CircuitBreakerService {
     const failures = await this.redis.incr(failuresKey);
 
     if (failures >= this.failureThreshold) {
-      await this.redis.pipeline()
+      await this.redis
+        .pipeline()
         .set(this.getStateKey(partnerSlug), CircuitState.OPEN)
         .set(this.getOpenedAtKey(partnerSlug), Date.now().toString())
         .del(this.getProbeKey(partnerSlug))
@@ -154,8 +157,12 @@ export class CircuitBreakerService {
   /**
    * Fetches current circuit status for operational monitoring.
    */
-  async getStatus(partnerSlug: string): Promise<{ state: CircuitState; consecutiveFailures: number }> {
-    const state = ((await this.redis.get(this.getStateKey(partnerSlug))) as CircuitState) || CircuitState.CLOSED;
+  async getStatus(
+    partnerSlug: string,
+  ): Promise<{ state: CircuitState; consecutiveFailures: number }> {
+    const state =
+      ((await this.redis.get(this.getStateKey(partnerSlug))) as CircuitState) ||
+      CircuitState.CLOSED;
     const failures = parseInt((await this.redis.get(this.getFailuresKey(partnerSlug))) || '0', 10);
     return { state, consecutiveFailures: failures };
   }
