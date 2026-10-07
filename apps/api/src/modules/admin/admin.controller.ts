@@ -57,7 +57,7 @@ export class AdminController {
   }
 
   @Post('reconciliation-logs/:id/resolve')
-  resolveReconciliationLog(
+  async resolveReconciliationLog(
     @Param('id') id: string,
     @Body() body: { action: 'ACCEPT_PARTNER' | 'KEEP_CANONICAL' | 'DISMISS' },
   ) {

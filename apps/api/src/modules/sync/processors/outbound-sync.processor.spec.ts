@@ -66,94 +66,131 @@ describe('OutboundSyncProcessor', () => {
     } as unknown as Job<any>;
   };
 
-  it('delays job and throws DelayedError without burning a retry when circuit is OPEN', async () => {
-    mockCircuitBreaker.canExecute.mockResolvedValue(false);
-    const job = createMockJob();
+  describe('Circuit-open delay', () => {
+    it('delays job and throws DelayedError without burning a retry when circuit is OPEN', async () => {
+      mockCircuitBreaker.canExecute.mockResolvedValue(false);
+      const job = createMockJob();
 
-    await expect(processor.process(job)).rejects.toThrow(DelayedError);
+      await expect(processor.process(job)).rejects.toThrow(DelayedError);
 
-    expect(mockCircuitBreaker.canExecute).toHaveBeenCalledWith('partner_a');
-    expect(job.moveToDelayed).toHaveBeenCalledWith(expect.any(Number), 'token-abc');
-    expect(prisma.syncJob.update).not.toHaveBeenCalled();
-    expect(mockCircuitBreaker.recordFailure).not.toHaveBeenCalled();
-  });
-
-  it('processes job successfully and records success on circuit breaker', async () => {
-    const job = createMockJob();
-
-    const result = await processor.process(job);
-
-    expect(result).toEqual({ success: true, partnerSyncId: 'ack-123' });
-    expect(mockCircuitBreaker.recordSuccess).toHaveBeenCalledWith('partner_a');
-    expect(prisma.syncJob.update).toHaveBeenCalledWith({
-      where: { id: 'sync-123' },
-      data: { status: SyncJobStatus.PROCESSING, attempts: 1 },
-    });
-    expect(prisma.syncJob.update).toHaveBeenCalledWith({
-      where: { id: 'sync-123' },
-      data: { status: SyncJobStatus.COMPLETED, lastError: null },
+      expect(mockCircuitBreaker.canExecute).toHaveBeenCalledWith('partner_a');
+      expect(job.moveToDelayed).toHaveBeenCalledWith(expect.any(Number), 'token-abc');
+      expect(prisma.syncJob.update).not.toHaveBeenCalled();
+      expect(mockCircuitBreaker.recordFailure).not.toHaveBeenCalled();
     });
   });
 
-  it('throws UnrecoverableError and sends to DLQ without tripping circuit on 4xx responses', async () => {
-    const error400 = new PartnerHttpError({
-      message: 'Invalid room type code',
-      status: 400,
-      isRetryable: false,
-    });
-    mockAdaptor.pushInventory.mockRejectedValue(error400);
+  describe('Successful processing', () => {
+    it('processes job successfully and records success on circuit breaker', async () => {
+      const job = createMockJob();
 
-    const job = createMockJob();
+      const result = await processor.process(job);
 
-    await expect(processor.process(job)).rejects.toThrow(UnrecoverableError);
-
-    // Circuit breaker must NOT record failure for 4xx errors
-    expect(mockCircuitBreaker.recordFailure).not.toHaveBeenCalled();
-
-    // Database record is moved directly to DEAD_LETTER (DLQ)
-    expect(prisma.syncJob.update).toHaveBeenCalledWith({
-      where: { id: 'sync-123' },
-      data: {
-        status: SyncJobStatus.DEAD_LETTER,
-        lastError: expect.stringContaining('4xx'),
-      },
+      expect(result).toEqual({ success: true, partnerSyncId: 'ack-123' });
+      expect(mockCircuitBreaker.recordSuccess).toHaveBeenCalledWith('partner_a');
+      expect(prisma.syncJob.update).toHaveBeenCalledWith({
+        where: { id: 'sync-123' },
+        data: { status: SyncJobStatus.PROCESSING, attempts: 1 },
+      });
+      expect(prisma.syncJob.update).toHaveBeenCalledWith({
+        where: { id: 'sync-123' },
+        data: { status: SyncJobStatus.COMPLETED, lastError: null },
+      });
     });
   });
 
-  it('records failure and trips circuit breaker on 5xx partner errors', async () => {
-    const error500 = new PartnerHttpError({
-      message: 'Partner service unavailable',
-      status: 503,
-      isRetryable: true,
+  describe('Retryable vs. unrecoverable errors', () => {
+    it('throws UnrecoverableError and sends to DLQ without tripping circuit on 4xx responses', async () => {
+      const error400 = new PartnerHttpError({
+        message: 'Invalid room type code',
+        status: 400,
+        isRetryable: false,
+      });
+      mockAdaptor.pushInventory.mockRejectedValue(error400);
+
+      const job = createMockJob();
+
+      await expect(processor.process(job)).rejects.toThrow(UnrecoverableError);
+
+      // Circuit breaker must NOT record failure for 4xx errors
+      expect(mockCircuitBreaker.recordFailure).not.toHaveBeenCalled();
+
+      // Database record is moved directly to DEAD_LETTER (DLQ)
+      expect(prisma.syncJob.update).toHaveBeenCalledWith({
+        where: { id: 'sync-123' },
+        data: {
+          status: SyncJobStatus.DEAD_LETTER,
+          lastError: expect.stringContaining('4xx'),
+        },
+      });
     });
-    mockAdaptor.pushInventory.mockRejectedValue(error500);
 
-    const job = createMockJob();
+    it('records failure and trips circuit breaker on 5xx retryable partner errors', async () => {
+      const error500 = new PartnerHttpError({
+        message: 'Partner service unavailable',
+        status: 503,
+        isRetryable: true,
+      });
+      mockAdaptor.pushInventory.mockRejectedValue(error500);
 
-    await expect(processor.process(job)).rejects.toThrow(error500);
+      const job = createMockJob();
 
-    expect(mockCircuitBreaker.recordFailure).toHaveBeenCalledWith('partner_a');
-    expect(prisma.syncJob.update).toHaveBeenCalledWith({
-      where: { id: 'sync-123' },
-      data: {
-        status: SyncJobStatus.FAILED,
-        lastError: expect.stringContaining('Partner service unavailable'),
-      },
+      await expect(processor.process(job)).rejects.toThrow(error500);
+
+      expect(mockCircuitBreaker.recordFailure).toHaveBeenCalledWith('partner_a');
+      expect(prisma.syncJob.update).toHaveBeenCalledWith({
+        where: { id: 'sync-123' },
+        data: {
+          status: SyncJobStatus.FAILED,
+          lastError: expect.stringContaining('Partner service unavailable'),
+        },
+      });
+    });
+
+    it('throws error when adaptor is not found for partner slug', async () => {
+      const job = createMockJob({
+        data: {
+          syncJobId: 'sync-999',
+          partnerSlug: 'unknown_partner',
+          update: {},
+        },
+      });
+
+      await expect(processor.process(job)).rejects.toThrow(
+        /Adaptor not found for partner slug: unknown_partner/,
+      );
     });
   });
 
-  it('moves job to DEAD_LETTER in onJobFailed hook when UnrecoverableError is thrown', async () => {
-    const job = createMockJob();
-    const error = new UnrecoverableError('Permanent validation rejection');
+  describe('DLQ transitions (onJobFailed hook)', () => {
+    it('moves job to DEAD_LETTER in onJobFailed hook when UnrecoverableError is thrown', async () => {
+      const job = createMockJob();
+      const error = new UnrecoverableError('Permanent validation rejection');
 
-    await processor.onJobFailed(job, error);
+      await processor.onJobFailed(job, error);
 
-    expect(prisma.syncJob.update).toHaveBeenCalledWith({
-      where: { id: 'sync-123' },
-      data: {
-        status: SyncJobStatus.DEAD_LETTER,
-        lastError: expect.stringContaining('Permanent validation rejection'),
-      },
+      expect(prisma.syncJob.update).toHaveBeenCalledWith({
+        where: { id: 'sync-123' },
+        data: {
+          status: SyncJobStatus.DEAD_LETTER,
+          lastError: expect.stringContaining('Permanent validation rejection'),
+        },
+      });
+    });
+
+    it('moves job to DEAD_LETTER in onJobFailed hook when retry attempts are exhausted', async () => {
+      const job = createMockJob({ attemptsMade: 5, opts: { attempts: 5 } });
+      const error = new Error('503 Service Unavailable repeatedly');
+
+      await processor.onJobFailed(job, error);
+
+      expect(prisma.syncJob.update).toHaveBeenCalledWith({
+        where: { id: 'sync-123' },
+        data: {
+          status: SyncJobStatus.DEAD_LETTER,
+          lastError: expect.stringContaining('Exhausted retries: 503 Service Unavailable repeatedly'),
+        },
+      });
     });
   });
 });

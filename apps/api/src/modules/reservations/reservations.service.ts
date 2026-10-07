@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { prisma } from '@cih/database';
@@ -27,7 +26,6 @@ export interface FindReservationsQuery {
 
 @Injectable()
 export class ReservationsService {
-  private readonly logger = new Logger(ReservationsService.name);
 
   /**
    * Retrieves paginated reservations matching partner, status, and date range filters.

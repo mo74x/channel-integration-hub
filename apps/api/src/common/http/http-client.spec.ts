@@ -90,11 +90,14 @@ describe('fetchWithTimeout', () => {
 
   it('throws PartnerHttpError with status and isRetryable on non-2xx status', async () => {
     const errorBody = JSON.stringify({ error: 'Service Unavailable' });
-    const mockResponse = new Response(errorBody, {
-      status: 503,
-      statusText: 'Service Unavailable',
-    });
-    global.fetch = jest.fn().mockResolvedValue(mockResponse);
+    global.fetch = jest.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(errorBody, {
+          status: 503,
+          statusText: 'Service Unavailable',
+        }),
+      ),
+    );
 
     await expect(
       fetchWithTimeout('https://api.partner.com/inventory', {

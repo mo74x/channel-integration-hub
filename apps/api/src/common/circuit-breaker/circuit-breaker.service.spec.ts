@@ -1,114 +1,120 @@
+import RedisMock from 'ioredis-mock';
 import { CircuitBreakerService, CircuitState } from './circuit-breaker.service.js';
-import Redis from 'ioredis';
 
-describe('CircuitBreakerService', () => {
+describe('CircuitBreakerService (with ioredis-mock)', () => {
   let service: CircuitBreakerService;
-  let mockRedis: jest.Mocked<Redis>;
-  let mockPipeline: any;
+  let redis: any;
 
-  beforeEach(() => {
-    mockPipeline = {
-      set: jest.fn().mockReturnThis(),
-      del: jest.fn().mockReturnThis(),
-      exec: jest.fn().mockResolvedValue([]),
-    };
+  beforeEach(async () => {
+    redis = new RedisMock();
+    await redis.flushall();
 
-    mockRedis = {
-      get: jest.fn(),
-      set: jest.fn(),
-      incr: jest.fn(),
-      pipeline: jest.fn().mockReturnValue(mockPipeline),
-    } as unknown as jest.Mocked<Redis>;
+    process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD = '3';
+    process.env.CIRCUIT_BREAKER_COOLDOWN_MS = '1000';
 
+    service = new CircuitBreakerService(redis);
+  });
+
+  afterEach(async () => {
+    await redis.flushall();
     delete process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD;
     delete process.env.CIRCUIT_BREAKER_COOLDOWN_MS;
-
-    service = new CircuitBreakerService(mockRedis);
   });
 
-  describe('canExecute', () => {
-    it('returns true when circuit is CLOSED', async () => {
-      mockRedis.get.mockResolvedValueOnce(CircuitState.CLOSED);
-      const allowed = await service.canExecute('partner_a');
-      expect(allowed).toBe(true);
-    });
+  describe('Full State Lifecycle: CLOSED -> OPEN -> HALF_OPEN -> CLOSED', () => {
+    it('progresses through all lifecycle states correctly', async () => {
+      const partner = 'partner_a';
 
-    it('returns false when circuit is OPEN and cooldown has not elapsed', async () => {
-      mockRedis.get
-        .mockResolvedValueOnce(CircuitState.OPEN)
-        .mockResolvedValueOnce(Date.now().toString()); // opened just now
+      // 1. Initial State: CLOSED
+      expect(await service.canExecute(partner)).toBe(true);
+      let status = await service.getStatus(partner);
+      expect(status.state).toBe(CircuitState.CLOSED);
+      expect(status.consecutiveFailures).toBe(0);
 
-      const allowed = await service.canExecute('partner_a');
-      expect(allowed).toBe(false);
-    });
+      // 2. Accumulate failures until threshold (3)
+      await service.recordFailure(partner);
+      await service.recordFailure(partner);
+      expect(await service.canExecute(partner)).toBe(true); // Still closed before 3rd failure
 
-    it('allows a single probe via SET NX when cooldown has elapsed, transitioning to HALF_OPEN', async () => {
-      const pastTime = (Date.now() - 35000).toString(); // 35s ago (cooldown is 30s)
-      mockRedis.get
-        .mockResolvedValueOnce(CircuitState.OPEN)
-        .mockResolvedValueOnce(pastTime);
+      await service.recordFailure(partner); // 3rd failure trips the circuit
+      status = await service.getStatus(partner);
+      expect(status.state).toBe(CircuitState.OPEN);
 
-      mockRedis.set.mockResolvedValueOnce('OK'); // SET NX succeeds for probe
+      // 3. In OPEN: Outbound calls fail fast while cooldown has not elapsed
+      expect(await service.canExecute(partner)).toBe(false);
 
-      const allowed = await service.canExecute('partner_a');
-      expect(allowed).toBe(true);
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        'circuit:partner_a:probe_lock',
-        '1',
-        'PX',
-        30000,
-        'NX',
-      );
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        'circuit:partner_a:state',
-        CircuitState.HALF_OPEN,
-      );
-    });
+      // 4. Simulate cooldown period elapsed (cooldown is 1000ms)
+      const pastOpenedAt = (Date.now() - 2000).toString();
+      await redis.set(`circuit:${partner}:opened_at`, pastOpenedAt);
 
-    it('rejects concurrent probe callers when SET NX returns null', async () => {
-      const pastTime = (Date.now() - 35000).toString();
-      mockRedis.get
-        .mockResolvedValueOnce(CircuitState.OPEN)
-        .mockResolvedValueOnce(pastTime);
+      // 5. Next call acts as a trial probe and transitions to HALF_OPEN
+      const probeAllowed = await service.canExecute(partner);
+      expect(probeAllowed).toBe(true);
+      status = await service.getStatus(partner);
+      expect(status.state).toBe(CircuitState.HALF_OPEN);
 
-      mockRedis.set.mockResolvedValueOnce(null as any); // Another worker holds the probe lock
-
-      const allowed = await service.canExecute('partner_a');
-      expect(allowed).toBe(false);
+      // 6. Successful probe response restores circuit to CLOSED
+      await service.recordSuccess(partner);
+      status = await service.getStatus(partner);
+      expect(status.state).toBe(CircuitState.CLOSED);
+      expect(status.consecutiveFailures).toBe(0);
+      expect(await service.canExecute(partner)).toBe(true);
     });
   });
 
-  describe('recordFailure', () => {
-    it('immediately re-opens circuit when in HALF_OPEN without waiting for threshold', async () => {
-      mockRedis.get.mockResolvedValueOnce(CircuitState.HALF_OPEN);
+  describe('Single-probe behaviour & concurrency', () => {
+    it('allows only a single probe through and rejects concurrent callers in HALF_OPEN', async () => {
+      const partner = 'partner_b';
 
-      await service.recordFailure('partner_a');
+      // Trip to OPEN
+      await service.recordFailure(partner);
+      await service.recordFailure(partner);
+      await service.recordFailure(partner);
 
-      expect(mockPipeline.set).toHaveBeenCalledWith('circuit:partner_a:state', CircuitState.OPEN);
-      expect(mockPipeline.del).toHaveBeenCalledWith('circuit:partner_a:probe_lock');
-      expect(mockPipeline.exec).toHaveBeenCalled();
+      // Cooldown elapses
+      const pastTime = (Date.now() - 2000).toString();
+      await redis.set(`circuit:${partner}:opened_at`, pastTime);
+
+      // Caller 1 acquires probe and transitions to HALF_OPEN
+      const caller1 = await service.canExecute(partner);
+      expect(caller1).toBe(true);
+
+      // Caller 2 tries during HALF_OPEN while probe_lock is active
+      const caller2 = await service.canExecute(partner);
+      expect(caller2).toBe(false);
     });
 
-    it('trips circuit to OPEN when failure count reaches threshold in CLOSED state', async () => {
-      mockRedis.get.mockResolvedValueOnce(CircuitState.CLOSED);
-      mockRedis.incr.mockResolvedValueOnce(5); // threshold is 5
+    it('immediately re-opens circuit when trial probe fails in HALF_OPEN', async () => {
+      const partner = 'partner_c';
 
-      await service.recordFailure('partner_a');
+      // Set directly to HALF_OPEN
+      await redis.set(`circuit:${partner}:state`, CircuitState.HALF_OPEN);
 
-      expect(mockPipeline.set).toHaveBeenCalledWith('circuit:partner_a:state', CircuitState.OPEN);
-      expect(mockPipeline.exec).toHaveBeenCalled();
+      // Probe fails
+      await service.recordFailure(partner);
+
+      const status = await service.getStatus(partner);
+      expect(status.state).toBe(CircuitState.OPEN);
+      expect(await service.canExecute(partner)).toBe(false);
     });
   });
 
-  describe('forceReset and recordSuccess', () => {
-    it('forceReset resets circuit to CLOSED and deletes all failure and probe keys', async () => {
-      await service.forceReset('partner_a');
+  describe('forceReset', () => {
+    it('resets circuit from OPEN directly back to CLOSED', async () => {
+      const partner = 'partner_d';
 
-      expect(mockPipeline.set).toHaveBeenCalledWith('circuit:partner_a:state', CircuitState.CLOSED);
-      expect(mockPipeline.del).toHaveBeenCalledWith('circuit:partner_a:failures');
-      expect(mockPipeline.del).toHaveBeenCalledWith('circuit:partner_a:opened_at');
-      expect(mockPipeline.del).toHaveBeenCalledWith('circuit:partner_a:probe_lock');
-      expect(mockPipeline.exec).toHaveBeenCalled();
+      await service.recordFailure(partner);
+      await service.recordFailure(partner);
+      await service.recordFailure(partner);
+
+      expect((await service.getStatus(partner)).state).toBe(CircuitState.OPEN);
+
+      await service.forceReset(partner);
+
+      const status = await service.getStatus(partner);
+      expect(status.state).toBe(CircuitState.CLOSED);
+      expect(status.consecutiveFailures).toBe(0);
+      expect(await service.canExecute(partner)).toBe(true);
     });
   });
 });

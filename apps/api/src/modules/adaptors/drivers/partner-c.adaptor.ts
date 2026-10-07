@@ -4,7 +4,6 @@ import { createHmac } from 'node:crypto';
 import { ReservationStatus, CanonicalReservationPayload } from '@cih/shared';
 import { PartnerAdaptor, PartnerCapabilities, WebhookValidationResult } from '../partner-adaptor.interface.js';
 import { safeCompare } from '../../../common/crypto/safe-compare.js';
-import { fetchWithTimeout } from '../../../common/http/http-client.js';
 
 @Injectable()
 export class PartnerCAdaptor implements PartnerAdaptor {
@@ -26,14 +25,6 @@ export class PartnerCAdaptor implements PartnerAdaptor {
       this.configService?.get<string>('PARTNER_C_HMAC_SECRET') ||
       process.env.PARTNER_C_HMAC_SECRET ||
       'c8f126f5e92be2b1a8f940821d3e86f8'
-    );
-  }
-
-  private get partnerBaseUrl(): string {
-    return (
-      this.configService?.get<string>('PARTNER_C_BASE_URL') ||
-      process.env.PARTNER_C_BASE_URL ||
-      'http://localhost:4000/partner-c'
     );
   }
 

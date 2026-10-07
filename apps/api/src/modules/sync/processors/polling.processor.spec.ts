@@ -1,7 +1,7 @@
 import { PollingProcessor } from './polling.processor.js';
 import { PartnerAdaptor } from '../../adaptors/partner-adaptor.interface.js';
 import { ReservationStateMachineService } from '../../reservations/reservation-state-machine.service.js';
-import { prisma, SyncJobType, SyncJobStatus } from '@cih/database';
+import { prisma, SyncJobStatus } from '@cih/database';
 
 jest.mock('@cih/database', () => ({
   prisma: {

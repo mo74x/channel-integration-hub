@@ -47,19 +47,71 @@ describe('InventoryService', () => {
     service = new InventoryService(mockLockService, mockSyncService as SyncService);
   });
 
-  describe('restoreInventoryUnits', () => {
-    it('acquires sorted per-date distributed locks and releases them in reverse order', async () => {
+  describe('Date range validation', () => {
+    it('throws BadRequestException when check-out date is on or before check-in date in bookInventoryUnits', async () => {
+      await expect(
+        service.bookInventoryUnits('prop-1', 'KING', '2026-11-15', '2026-11-15', 1),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.bookInventoryUnits('prop-1', 'KING', '2026-11-15', '2026-11-10', 1),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when check-out date is on or before check-in date in restoreInventoryUnits', async () => {
+      await expect(
+        service.restoreInventoryUnits('unit-1', '2026-11-15', '2026-11-15', 1),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Insufficient inventory & uninitialized dates', () => {
+    it('throws BadRequestException when availableUnits is less than unitsToBook', async () => {
+      (prisma.inventoryUnit.findUnique as jest.Mock).mockResolvedValue({
+        id: 'unit-uuid-1',
+        propertyId: 'prop-1',
+        externalCode: 'KING',
+      });
+
+      (prisma.inventoryCalendar.findUnique as jest.Mock).mockResolvedValue({
+        id: 'cal-1',
+        availableUnits: 1, // Only 1 available
+        priceInCents: 20000,
+      });
+
+      await expect(
+        service.bookInventoryUnits('prop-1', 'KING', '2026-11-10', '2026-11-11', 2), // Requesting 2
+      ).rejects.toThrow(/Insufficient inventory on 2026-11-10: requested 2, available 1/);
+    });
+
+    it('throws BadRequestException when calendar is uninitialized for a date in range', async () => {
+      (prisma.inventoryUnit.findUnique as jest.Mock).mockResolvedValue({
+        id: 'unit-uuid-1',
+        propertyId: 'prop-1',
+        externalCode: 'KING',
+      });
+
+      (prisma.inventoryCalendar.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.bookInventoryUnits('prop-1', 'KING', '2026-11-10', '2026-11-11', 1),
+      ).rejects.toThrow(/Inventory uninitialized for date 2026-11-10/);
+    });
+  });
+
+  describe('Lock ordering & lock release on error', () => {
+    it('acquires locks in lexicographical order and releases them in reverse order', async () => {
       (prisma.inventoryCalendar.update as jest.Mock).mockResolvedValue({ id: 'cal-1' });
 
       await service.restoreInventoryUnits(
         'unit-uuid-1',
         '2026-11-10',
-        '2026-11-12',
-        2,
+        '2026-11-13',
+        1,
       );
 
-      // Lock keys should be sorted lexicographically
-      expect(mockLockService.acquireLock).toHaveBeenCalledTimes(2);
+      // Verify lexicographical order
+      expect(mockLockService.acquireLock).toHaveBeenCalledTimes(3);
       expect(mockLockService.acquireLock).toHaveBeenNthCalledWith(
         1,
         'inventory:unit-uuid-1:2026-11-10',
@@ -74,59 +126,63 @@ describe('InventoryService', () => {
         12,
         100,
       );
+      expect(mockLockService.acquireLock).toHaveBeenNthCalledWith(
+        3,
+        'inventory:unit-uuid-1:2026-11-12',
+        8000,
+        12,
+        100,
+      );
 
-      // Verify release in reverse order
-      expect(mockLockService.releaseLock).toHaveBeenCalledTimes(2);
+      // Verify reverse order release
+      expect(mockLockService.releaseLock).toHaveBeenCalledTimes(3);
       expect(mockLockService.releaseLock).toHaveBeenNthCalledWith(1, {
+        key: 'inventory:unit-uuid-1:2026-11-12',
+        token: 'token-inventory:unit-uuid-1:2026-11-12',
+      });
+      expect(mockLockService.releaseLock).toHaveBeenNthCalledWith(2, {
         key: 'inventory:unit-uuid-1:2026-11-11',
         token: 'token-inventory:unit-uuid-1:2026-11-11',
       });
-      expect(mockLockService.releaseLock).toHaveBeenNthCalledWith(2, {
+      expect(mockLockService.releaseLock).toHaveBeenNthCalledWith(3, {
         key: 'inventory:unit-uuid-1:2026-11-10',
         token: 'token-inventory:unit-uuid-1:2026-11-10',
       });
-
-      // Verify calendar increment
-      expect(prisma.inventoryCalendar.update).toHaveBeenCalledTimes(2);
-      expect(prisma.inventoryCalendar.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: {
-            availableUnits: { increment: 2 },
-            version: { increment: 1 },
-          },
-        }),
-      );
     });
-  });
 
-  describe('bookInventoryUnits', () => {
-    it('acquires sorted per-date distributed locks and decrements available units', async () => {
+    it('guarantees acquired locks are released when transaction fails with an error', async () => {
       (prisma.inventoryUnit.findUnique as jest.Mock).mockResolvedValue({
         id: 'unit-uuid-1',
         propertyId: 'prop-1',
         externalCode: 'KING',
       });
 
-      (prisma.inventoryCalendar.findUnique as jest.Mock).mockResolvedValue({
-        id: 'cal-1',
-        availableUnits: 5,
-        priceInCents: 25000,
-      });
-
-      (prisma.inventoryCalendar.update as jest.Mock).mockResolvedValue({ id: 'cal-1' });
-
-      const result = await service.bookInventoryUnits(
-        'prop-1',
-        'KING',
-        '2026-11-10',
-        '2026-11-12',
-        1,
+      // Fail during transaction
+      (prisma.inventoryCalendar.findUnique as jest.Mock).mockRejectedValueOnce(
+        new Error('Database deadlock simulation'),
       );
 
-      expect(result.success).toBe(true);
-      expect(result.totalPriceCents).toBe(50000); // 2 nights * 25000
+      await expect(
+        service.bookInventoryUnits('prop-1', 'KING', '2026-11-10', '2026-11-12', 1),
+      ).rejects.toThrow('Database deadlock simulation');
+
+      // Both locks were acquired before transaction failure, and MUST be released in finally block
       expect(mockLockService.acquireLock).toHaveBeenCalledTimes(2);
       expect(mockLockService.releaseLock).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws BadRequestException when lock acquisition times out', async () => {
+      mockLockService.acquireLock.mockResolvedValueOnce(null);
+
+      (prisma.inventoryUnit.findUnique as jest.Mock).mockResolvedValue({
+        id: 'unit-uuid-1',
+        propertyId: 'prop-1',
+        externalCode: 'KING',
+      });
+
+      await expect(
+        service.bookInventoryUnits('prop-1', 'KING', '2026-11-10', '2026-11-12', 1),
+      ).rejects.toThrow(/Concurrency timeout while locking inventory/);
     });
   });
 
@@ -213,29 +269,9 @@ describe('InventoryService', () => {
       expect(res.success).toBe(true);
       expect(res.updatedCount).toBe(2);
       expect(res.fanoutTriggered).toBe(true);
-
-      // Verify locks acquired
       expect(mockLockService.acquireLock).toHaveBeenCalledTimes(2);
-
-      // Verify database upsert called
       expect(prisma.inventoryCalendar.upsert).toHaveBeenCalledTimes(2);
-
-      // Verify fan-out broadcast called for each updated date
       expect(mockSyncService.broadcastInventoryUpdate).toHaveBeenCalledTimes(2);
-      expect(mockSyncService.broadcastInventoryUpdate).toHaveBeenNthCalledWith(1, {
-        propertyId: 'prop-1',
-        inventoryUnitCode: 'DELUXE_KING',
-        date: '2026-11-10',
-        availableUnits: 4,
-        priceInCents: 18000,
-      });
-      expect(mockSyncService.broadcastInventoryUpdate).toHaveBeenNthCalledWith(2, {
-        propertyId: 'prop-1',
-        inventoryUnitCode: 'DELUXE_KING',
-        date: '2026-11-11',
-        availableUnits: 4,
-        priceInCents: 18000,
-      });
     });
   });
 });

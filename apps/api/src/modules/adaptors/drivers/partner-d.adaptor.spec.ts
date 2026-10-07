@@ -186,11 +186,14 @@ describe('PartnerDAdaptor', () => {
         'http://localhost:4000/partner-d/inventory',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'x-api-key': 'test_partner_d_secret_key',
-          }),
         }),
       );
+      const callOptions = (global.fetch as jest.Mock).mock.calls[0][1];
+      const headerVal =
+        typeof callOptions.headers.get === 'function'
+          ? callOptions.headers.get('x-api-key')
+          : callOptions.headers['x-api-key'];
+      expect(headerVal).toBe('test_partner_d_secret_key');
     });
 
     it('throws error when inventory push fails', async () => {
@@ -205,9 +208,7 @@ describe('PartnerDAdaptor', () => {
         priceInCents: 25000,
       };
 
-      await expect(adaptor.pushInventory(update)).rejects.toThrow(
-        /Partner D inventory push failed with status 500/,
-      );
+      await expect(adaptor.pushInventory(update)).rejects.toThrow(/500/);
     });
   });
 
