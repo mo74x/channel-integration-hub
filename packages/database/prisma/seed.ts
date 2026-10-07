@@ -61,6 +61,17 @@ async function main() {
     },
   });
 
+  const partnerD = await prisma.partner.create({
+    data: {
+      slug: 'partner_d',
+      name: 'Vanguard Suites Hub (Partner D)',
+      authType: PartnerAuthType.API_KEY,
+      status: PartnerStatus.ACTIVE,
+      apiKey: process.env.PARTNER_D_API_KEY || 'cih_live_partner_d_key_112233',
+      rateLimitConfig: { maxRps: 25, burst: 50 },
+    },
+  });
+
   // 3. Seed Canonical Property
   const property = await prisma.property.create({
     data: {
@@ -77,6 +88,7 @@ async function main() {
       { propertyId: property.id, partnerId: partnerA.id, externalPropertyId: 'EXT-PROP-A-101' },
       { propertyId: property.id, partnerId: partnerB.id, externalPropertyId: 'EXT-PROP-B-202' },
       { propertyId: property.id, partnerId: partnerC.id, externalPropertyId: 'EXT-PROP-C-303' },
+      { propertyId: property.id, partnerId: partnerD.id, externalPropertyId: 'EXT-PROP-D-404' },
     ],
   });
 
@@ -131,7 +143,7 @@ async function main() {
   });
 
   console.log('Seed completed successfully:');
-  console.log(`- 3 Partners created: ${partnerA.slug}, ${partnerB.slug}, ${partnerC.slug}`);
+  console.log(`- 4 Partners created: ${partnerA.slug}, ${partnerB.slug}, ${partnerC.slug}, ${partnerD.slug}`);
   console.log(`- Property: "${property.name}" (${property.id})`);
   console.log(`- 2 Unit Types initialized with 30-day calendar availability windows.`);
 }
