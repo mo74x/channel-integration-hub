@@ -12,6 +12,17 @@ import {
   Inject,
   Logger,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiParam,
+  ApiOkResponse,
+  ApiBadRequestResponse,
+  ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
+  ApiSecurity,
+  ApiBody,
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { createHash } from 'node:crypto';
 import { prisma } from '@cih/database';
@@ -19,7 +30,9 @@ import { CanonicalReservationSchema } from '@cih/shared';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service.js';
 import { ReservationStateMachineService } from '../reservations/reservation-state-machine.service.js';
 import { PartnerAdaptor } from '../adaptors/partner-adaptor.interface.js';
+import { WebhookAcknowledgmentDto } from './dto/webhook-response.dto.js';
 
+@ApiTags('Webhooks')
 @Controller('webhooks')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
@@ -33,6 +46,21 @@ export class WebhooksController {
 
   @Post(':partnerSlug')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Receive partner webhook',
+    description:
+      'Ingests an inbound reservation webhook from a partner. ' +
+      'The payload is verified using the partner-specific authentication strategy (API-Key, OAuth2, HMAC-SHA256), ' +
+      'normalised into the canonical reservation schema, deduplicated via idempotency keys, ' +
+      'and processed through the reservation state machine.',
+  })
+  @ApiParam({ name: 'partnerSlug', description: 'Partner identifier slug (e.g. partner_a, partner_b)', example: 'partner_a' })
+  @ApiSecurity('PartnerApiKey')
+  @ApiBody({ description: 'Raw partner reservation payload (format varies by partner).' })
+  @ApiOkResponse({ description: 'Webhook acknowledged; reservation created or updated.', type: WebhookAcknowledgmentDto })
+  @ApiBadRequestResponse({ description: 'No adaptor registered for the given partner slug.' })
+  @ApiUnauthorizedResponse({ description: 'Webhook signature / credential verification failed.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unable to resolve property mapping or canonical schema validation failed.' })
   async handleIncomingWebhook(
     @Param('partnerSlug') partnerSlug: string,
     @Headers() headers: Record<string, string | string[]>,
@@ -154,3 +182,4 @@ export class WebhooksController {
     }
   }
 }
+
